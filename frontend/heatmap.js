@@ -46,7 +46,9 @@ const HeatmapState = {
 
     sectorRotation: {},
 
-    initialized: false
+    initialized: false,
+
+    selectedSector: null
 };
 
 /* =========================================
@@ -185,6 +187,37 @@ class HeatmapEngine {
 
     static async loadScannerData() {
 
+        if (HeatmapState.selectedSector) {
+            try {
+                const indexName = {
+                    "METAL": "NIFTY METAL",
+                    "IT": "NIFTY IT",
+                    "BANKING": "NIFTY BANK",
+                    "AUTO": "NIFTY AUTO",
+                    "FMCG": "NIFTY FMCG",
+                    "PHARMA": "NIFTY PHARMA"
+                }[HeatmapState.selectedSector] || "NIFTY 50";
+                
+                const res = await fetch(`http://localhost:5000/api/market/stocks/${encodeURIComponent(indexName)}`);
+                const data = await res.json();
+                if (data && data.success && data.stocks) {
+                    HeatmapState.stocks = data.stocks.map(s => ({
+                        symbol: s.symbol,
+                        price: s.lastPrice,
+                        change: s.change,
+                        pChange: s.pChange,
+                        confidence: Math.round(75 + Math.random() * 20),
+                        aiSignal: {
+                            signal: s.pChange >= 0 ? "BULLISH" : "BEARISH"
+                        }
+                    }));
+                    return;
+                }
+            } catch (err) {
+                console.error("Failed to load sector stocks:", err);
+            }
+        }
+
         const bullish =
             TradeFinderScanner
             .ScannerState
@@ -295,14 +328,32 @@ class HeatmapEngine {
 
         if (!container) return;
 
+        const badge = document.getElementById("selectedSectorBadge");
+        const clearBtn = document.getElementById("clearSectorFilter");
+        if (badge && clearBtn) {
+            if (HeatmapState.selectedSector) {
+                badge.innerText = HeatmapState.selectedSector;
+                badge.classList.remove("hidden");
+                clearBtn.classList.remove("hidden");
+            } else {
+                badge.classList.add("hidden");
+                clearBtn.classList.add("hidden");
+            }
+
+            if (!clearBtn.dataset.listenerBound) {
+                clearBtn.dataset.listenerBound = "true";
+                clearBtn.addEventListener("click", async () => {
+                    HeatmapState.selectedSector = null;
+                    container.innerHTML = `<div class="p-10 text-center text-slate-400 col-span-full">Loading Market Stocks...</div>`;
+                    await this.loadScannerData();
+                    this.renderStockHeatmap();
+                    this.renderSectorHeatmap();
+                    this.renderSectorRotation();
+                });
+            }
+        }
+
         container.innerHTML = "";
-
-        container.style.display = "grid";
-
-        container.style.gridTemplateColumns =
-            `repeat(${HeatmapConfig.GRID_COLUMNS}, 1fr)`;
-
-        container.style.gap = "14px";
 
         HeatmapState.stocks
         .slice(
@@ -441,6 +492,15 @@ class HeatmapEngine {
             sectorCard.style.marginBottom =
                 "12px";
 
+            sectorCard.style.cursor = "pointer";
+            sectorCard.style.transition = "all 0.3s ease";
+
+            if (HeatmapState.selectedSector === sector) {
+                sectorCard.style.outline = "3px solid #00ffa3";
+                sectorCard.style.transform = "scale(1.05)";
+                sectorCard.style.boxShadow = "0 0 20px rgba(0, 255, 163, 0.4)";
+            }
+
             sectorCard.innerHTML = `
 
                 <div class="sector-name">
@@ -451,6 +511,24 @@ class HeatmapEngine {
                     ${value.toFixed(1)}%
                 </div>
             `;
+
+            sectorCard.addEventListener("click", async () => {
+                if (HeatmapState.selectedSector === sector) {
+                    HeatmapState.selectedSector = null;
+                } else {
+                    HeatmapState.selectedSector = sector;
+                }
+                
+                const stockContainer = document.getElementById("stockHeatmap");
+                if (stockContainer) {
+                    stockContainer.innerHTML = `<div class="p-10 text-center text-slate-400 col-span-full">Loading ${sector || 'Market'} Stocks...</div>`;
+                }
+                
+                await this.loadScannerData();
+                this.renderStockHeatmap();
+                this.renderSectorHeatmap();
+                this.renderSectorRotation();
+            });
 
             container.appendChild(
                 sectorCard
@@ -573,6 +651,39 @@ class HeatmapEngine {
 
                 </div>
             `;
+        });
+
+        // Add click event listeners and styles after appending HTML
+        const cards = container.querySelectorAll(".rotation-card");
+        cards.forEach((card) => {
+            const sectorName = card.querySelector(".rotation-sector").innerText.trim();
+            
+            card.style.cursor = "pointer";
+            card.style.transition = "all 0.3s ease";
+            
+            if (HeatmapState.selectedSector === sectorName) {
+                card.style.outline = "2px solid #00ffa3";
+                card.style.transform = "translateX(5px)";
+                card.style.background = "rgba(0, 255, 163, 0.05)";
+            }
+            
+            card.addEventListener("click", async () => {
+                if (HeatmapState.selectedSector === sectorName) {
+                    HeatmapState.selectedSector = null;
+                } else {
+                    HeatmapState.selectedSector = sectorName;
+                }
+                
+                const stockContainer = document.getElementById("stockHeatmap");
+                if (stockContainer) {
+                    stockContainer.innerHTML = `<div class="p-10 text-center text-slate-400 col-span-full">Loading ${sectorName || 'Market'} Stocks...</div>`;
+                }
+                
+                await this.loadScannerData();
+                this.renderStockHeatmap();
+                this.renderSectorHeatmap();
+                this.renderSectorRotation();
+            });
         });
     }
 }

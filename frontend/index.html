@@ -13,247 +13,170 @@
   <script></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <style>
-    * {
-      font-family: 'Inter', sans-serif;
-    }
-
-    body {
-      background: #050816;
-      overflow-x: hidden;
-    }
-
-    .glass {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.08);
-      backdrop-filter: blur(14px);
-    }
-   
-    .glow-green {
-      box-shadow: 0 0 25px rgba(0,255,163,0.35);
-    }
-
-    .glow-red {
-      box-shadow: 0 0 25px rgba(255,0,85,0.35);
-    }
-
-    .gradient-border {
-      position: relative;
-      border-radius: 20px;
-      overflow: hidden;
-    }
-
-    .gradient-border::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    padding: 1px;
-    border-radius: 20px;
-    background: linear-gradient(
-        135deg,
-        #00ffa3,
-        #00b7ff,
-        #8b5cf6
-    );
-    -webkit-mask: linear-gradient(#fff 0 0) content-box,
-                  linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box,
-          linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-}
-
-    .floating {
-      animation: float 4s ease-in-out infinite;
-    }
-
-    @keyframes float {
-      0%,100% {
-        transform: translateY(0px);
-      }
-      50% {
-        transform: translateY(-10px);
-      }
-    }
-
-    .ticker {
-      animation: ticker 18s linear infinite;
-      white-space: nowrap;
-    }
-
-    @keyframes ticker {
-      0% {
-        transform: translateX(100%);
-      }
-      100% {
-        transform: translateX(-100%);
-      }
-    }
-
-    .heat-green {
-      background: linear-gradient(135deg,#0f766e,#00ffa3);
-    }
-
-    .heat-red {
-      background: linear-gradient(135deg,#7f1d1d,#ff0055);
-    }
-
-    .heat-neutral {
-      background: linear-gradient(135deg,#1e293b,#334155);
-    }
-
-    .signal-pulse {
-      animation: pulseGlow 1.8s infinite;
-    }
-
-    @keyframes pulseGlow {
-      0% {
-        box-shadow: 0 0 0 rgba(0,255,163,0.2);
-      }
-      50% {
-        box-shadow: 0 0 30px rgba(0,255,163,0.5);
-      }
-      100% {
-        box-shadow: 0 0 0 rgba(0,255,163,0.2);
-      }
-    }
-  </style>
 </head>
-<body class="text-white min-h-screen">
+<body class="text-white min-h-screen bg-[#050816]">
 
   <!-- NAVBAR -->
-  <nav class="w-full px-8 py-5 flex items-center justify-between glass sticky top-0 z-50">
-    <div class="flex items-center gap-4">
-      <div class="w-12 h-12 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 flex items-center justify-center text-black font-black text-xl glow-green">
-        TF
+  <nav class="w-full glass sticky top-0 z-50">
+    <div class="max-w-[1400px] mx-auto px-4 sm:px-8 py-4 sm:py-5 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 flex items-center justify-center text-black font-black text-xl glow-green">
+          TF
+        </div>
+
+        <div>
+          <h1 class="text-xl sm:text-2xl font-extrabold tracking-wide">TradeFinder AI</h1>
+          <p class="text-[10px] sm:text-xs text-slate-400">Realtime Intraday Intelligence</p>
+        </div>
       </div>
 
-      <div>
-        <h1 class="text-2xl font-extrabold tracking-wide">TradeFinder AI</h1>
-        <p class="text-xs text-slate-400">Realtime Intraday Intelligence</p>
+      <div class="hidden lg:flex items-center gap-8 xl:gap-10 text-sm font-medium text-slate-300">
+        <a data-tab="dashboard" class="tab-link cursor-pointer hover:text-emerald-400 transition text-emerald-400">Dashboard</a>
+        <a data-tab="scanner" class="tab-link cursor-pointer hover:text-emerald-400 transition">Scanner</a>
+        <a data-tab="signals" class="tab-link cursor-pointer hover:text-emerald-400 transition">AI Signals</a>
+        <a data-tab="heatmap" class="tab-link cursor-pointer hover:text-emerald-400 transition">Heatmap</a>
+        <a data-tab="options" class="tab-link cursor-pointer hover:text-emerald-400 transition">Options Chain</a>
+        <a data-tab="backtest" class="tab-link cursor-pointer hover:text-emerald-400 transition">Backtesting</a>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <button class="btn-live-market hidden sm:block bg-gradient-to-r from-emerald-400 to-cyan-500 text-black px-5 py-2.5 sm:px-6 sm:py-3 rounded-xl font-bold hover:scale-105 transition-all duration-300 glow-green text-sm sm:text-base">
+          LIVE MARKET
+        </button>
+        
+        <!-- Hamburger Button -->
+        <button id="menu-btn" class="lg:hidden text-slate-300 hover:text-white focus:outline-none p-2 rounded-xl hover:bg-white/5 transition duration-300">
+          <svg id="menu-icon-open" class="w-6 h-6 sm:w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+          <svg id="menu-icon-close" class="w-6 h-6 sm:w-7 h-7 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
       </div>
     </div>
 
-    <div class="hidden lg:flex items-center gap-10 text-sm font-medium text-slate-300">
-      <a href="#" class="hover:text-emerald-400 transition">Dashboard</a>
-      <a href="#" class="hover:text-emerald-400 transition">Scanner</a>
-      <a href="#" class="hover:text-emerald-400 transition">AI Signals</a>
-      <a href="#" class="hover:text-emerald-400 transition">Heatmap</a>
-      <a href="#" class="hover:text-emerald-400 transition">Options Chain</a>
-      <a href="#" class="hover:text-emerald-400 transition">Backtesting</a>
+    <!-- MOBILE MENU (Hidden by default) -->
+    <div id="mobile-menu" class="hidden lg:hidden w-full glass border-b border-slate-800/80 absolute left-0 right-0 top-full px-6 sm:px-8 py-6 flex flex-col gap-4 text-slate-300 font-medium z-40 transition-all duration-300">
+      <a data-tab="dashboard" class="tab-link cursor-pointer hover:text-emerald-400 transition py-2 border-b border-white/5 text-emerald-400">Dashboard</a>
+      <a data-tab="scanner" class="tab-link cursor-pointer hover:text-emerald-400 transition py-2 border-b border-white/5">Scanner</a>
+      <a data-tab="signals" class="tab-link cursor-pointer hover:text-emerald-400 transition py-2 border-b border-white/5">AI Signals</a>
+      <a data-tab="heatmap" class="tab-link cursor-pointer hover:text-emerald-400 transition py-2 border-b border-white/5">Heatmap</a>
+      <a data-tab="options" class="tab-link cursor-pointer hover:text-emerald-400 transition py-2 border-b border-white/5">Options Chain</a>
+      <a data-tab="backtest" class="tab-link cursor-pointer hover:text-emerald-400 transition py-2">Backtesting</a>
+      <button class="btn-live-market bg-gradient-to-r from-emerald-400 to-cyan-500 text-black px-6 py-3 rounded-xl font-bold hover:scale-105 transition-all duration-300 glow-green w-full mt-2 text-sm sm:text-base">
+        LIVE MARKET
+      </button>
     </div>
-
-    <button class="bg-gradient-to-r from-emerald-400 to-cyan-500 text-black px-6 py-3 rounded-xl font-bold hover:scale-105 transition-all duration-300 glow-green">
-      LIVE MARKET
-    </button>
   </nav>
 
   <!-- TICKER -->
   <div class="overflow-hidden border-y border-slate-800 bg-black/30 py-3">
-    <div class="ticker text-sm font-semibold text-emerald-400">
-      NIFTY 50 ▲ 0.82% &nbsp;&nbsp;&nbsp; BANKNIFTY ▲ 1.14% &nbsp;&nbsp;&nbsp; RELIANCE ▲ 2.11% &nbsp;&nbsp;&nbsp; TCS ▼ 0.44% &nbsp;&nbsp;&nbsp; INFY ▲ 1.24% &nbsp;&nbsp;&nbsp; HDFCBANK ▲ 0.66% &nbsp;&nbsp;&nbsp; FINNIFTY ▲ 0.95% &nbsp;&nbsp;&nbsp; AI Bullish Probability: 82%
+    <div id="liveTicker" class="ticker text-sm font-semibold text-emerald-400">
+      Loading live market indices...
     </div>
   </div>
 
   <!-- HERO SECTION -->
-  <section class="relative px-8 lg:px-20 py-20 overflow-hidden">
+  <div id="tab-dashboard" class="tab-content block">
+  <section class="hero-section relative px-4 sm:px-8 lg:px-20 py-10 sm:py-20 overflow-hidden">
 
     <div class="absolute top-0 left-0 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[140px]"></div>
     <div class="absolute bottom-0 right-0 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[140px]"></div>
 
-    <div class="grid lg:grid-cols-2 gap-14 items-center relative z-10">
+    <div class="max-w-[1400px] mx-auto grid lg:grid-cols-2 gap-8 lg:gap-14 items-center relative z-10">
 
       <div>
-        <div class="inline-flex items-center gap-2 px-5 py-2 rounded-full glass border border-emerald-500/30 mb-8">
-          <span class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span class="text-sm text-emerald-300 font-semibold">AI Engine Active</span>
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 sm:px-5 sm:py-2 rounded-full glass border border-emerald-500/30 mb-6 sm:mb-8">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-xs sm:text-sm text-emerald-300 font-semibold">AI Engine Active</span>
         </div>
 
-        <h1 class="text-5xl lg:text-7xl font-black leading-tight mb-8">
+        <h1 class="hero-title text-4xl sm:text-5xl lg:text-7xl font-black leading-tight mb-6 sm:mb-8">
           Predict <span class="text-emerald-400">Bullish</span>
           & <span class="text-red-400">Bearish</span>
           Moves Before The Market.
         </h1>
 
-        <p class="text-slate-400 text-lg leading-relaxed mb-10 max-w-2xl">
+        <p class="hero-text text-slate-400 text-base sm:text-lg leading-relaxed mb-6 sm:mb-10 max-w-2xl">
           Institutional-grade AI stock prediction platform with realtime scanners, smart money flow tracking, options analysis, momentum detection, heatmaps, breakout signals, and advanced intraday trading intelligence.
         </p>
 
-        <div class="flex flex-wrap gap-5">
-          <button class="bg-gradient-to-r from-emerald-400 to-cyan-500 text-black px-8 py-4 rounded-2xl font-bold text-lg hover:scale-105 transition-all glow-green">
+        <div class="flex flex-col sm:flex-row gap-4 sm:gap-5">
+          <button id="btn-start-trading" class="w-full sm:w-auto bg-gradient-to-r from-emerald-400 to-cyan-500 text-black px-6 py-3.5 sm:px-8 sm:py-4 rounded-2xl font-bold text-base sm:text-lg hover:scale-105 transition-all glow-green">
             Start Live Trading
           </button>
 
-          <button class="glass px-8 py-4 rounded-2xl border border-slate-700 font-semibold hover:border-cyan-400 transition-all">
+          <button id="btn-watch-demo" class="w-full sm:w-auto glass px-6 py-3.5 sm:px-8 sm:py-4 rounded-2xl border border-slate-700 font-semibold hover:border-cyan-400 transition-all text-base sm:text-lg">
             Watch AI Demo
           </button>
         </div>
 
-        <div class="grid grid-cols-3 gap-6 mt-14">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mt-10 sm:mt-14">
           <div class="glass p-5 rounded-2xl">
-            <h2 class="text-4xl font-black text-emerald-400">94%</h2>
-            <p class="text-slate-400 mt-2">AI Accuracy</p>
+            <h2 class="text-3xl sm:text-4xl font-black text-emerald-400">94%</h2>
+            <p class="text-slate-400 mt-2 text-sm sm:text-base">AI Accuracy</p>
           </div>
 
           <div class="glass p-5 rounded-2xl">
-            <h2 class="text-4xl font-black text-cyan-400">350+</h2>
-            <p class="text-slate-400 mt-2">Realtime Signals</p>
+            <h2 class="text-3xl sm:text-4xl font-black text-cyan-400">350+</h2>
+            <p class="text-slate-400 mt-2 text-sm sm:text-base">Realtime Signals</p>
           </div>
 
           <div class="glass p-5 rounded-2xl">
-            <h2 class="text-4xl font-black text-purple-400">24/7</h2>
-            <p class="text-slate-400 mt-2">AI Monitoring</p>
+            <h2 class="text-3xl sm:text-4xl font-black text-purple-400">24/7</h2>
+            <p class="text-slate-400 mt-2 text-sm sm:text-base">AI Monitoring</p>
           </div>
         </div>
       </div>
 
       <!-- RIGHT DASHBOARD -->
       <div class="floating">
-        <div class="gradient-border glass rounded-[28px] p-6">
+        <div class="gradient-border glass rounded-[28px] p-4 sm:p-6">
 
-          <div class="flex items-center justify-between mb-8">
+          <div class="flex items-center justify-between mb-6 sm:mb-8">
             <div>
-              <h2 class="text-2xl font-bold">Live AI Dashboard</h2>
-              <p class="text-slate-400 text-sm">Realtime Market Intelligence</p>
+              <h2 class="text-xl sm:text-2xl font-bold">Live AI Dashboard</h2>
+              <p class="text-slate-400 text-xs sm:text-sm">Realtime Market Intelligence</p>
             </div>
 
-            <div class="px-4 py-2 bg-emerald-500/20 rounded-xl text-emerald-400 font-bold signal-pulse">
+            <div class="px-3.5 py-1.5 sm:px-4 sm:py-2 bg-emerald-500/20 rounded-xl text-emerald-400 font-bold signal-pulse text-xs sm:text-sm">
               LIVE
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-5 mb-6">
-            <div class="glass rounded-2xl p-5 border border-emerald-500/20">
-              <p class="text-slate-400 text-sm mb-2">Bullish Strength</p>
-              <h2 class="text-4xl font-black text-emerald-400">82%</h2>
+          <div class="grid grid-cols-2 gap-3 sm:gap-5 mb-6">
+            <div class="glass rounded-2xl p-4 sm:p-5 border border-emerald-500/20">
+              <p class="text-slate-400 text-xs sm:text-sm mb-2">Bullish Strength</p>
+              <h2 id="dashboardBullishStrength" class="text-3xl sm:text-4xl font-black text-emerald-400">82%</h2>
             </div>
 
-            <div class="glass rounded-2xl p-5 border border-red-500/20">
-              <p class="text-slate-400 text-sm mb-2">Bearish Strength</p>
-              <h2 class="text-4xl font-black text-red-400">18%</h2>
+            <div class="glass rounded-2xl p-4 sm:p-5 border border-red-500/20">
+              <p class="text-slate-400 text-xs sm:text-sm mb-2">Bearish Strength</p>
+              <h2 id="dashboardBearishStrength" class="text-3xl sm:text-4xl font-black text-red-400">18%</h2>
             </div>
           </div>
 
-          <div class="glass rounded-2xl p-5 mb-6">
+          <div class="glass rounded-2xl p-4 sm:p-5 mb-6">
             <div class="flex justify-between mb-4">
-              <h3 class="font-bold">AI Momentum Prediction</h3>
-              <span class="text-emerald-400 font-bold">STRONG BUY</span>
+              <h3 class="font-bold text-sm sm:text-base">AI Momentum Prediction</h3>
+              <span id="dashboardMomentumPrediction" class="text-emerald-400 font-bold text-xs sm:text-sm">STRONG BUY</span>
             </div>
 
-            <canvas id="marketChart" height="130"></canvas>
+            <div class="relative w-full h-[180px] sm:h-[220px]">
+              <canvas id="marketChart"></canvas>
+            </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-5">
-            <div class="glass rounded-2xl p-5">
-              <p class="text-slate-400 text-sm mb-2">Volume Spike</p>
-              <h2 class="text-3xl font-black text-cyan-400">+224%</h2>
+          <div class="grid grid-cols-2 gap-3 sm:gap-5">
+            <div class="glass rounded-2xl p-4 sm:p-5">
+              <p class="text-slate-400 text-xs sm:text-sm mb-2">Volume Spike</p>
+              <h2 id="dashboardVolumeSpike" class="text-2xl sm:text-3xl font-black text-cyan-400">+224%</h2>
             </div>
 
-            <div class="glass rounded-2xl p-5">
-              <p class="text-slate-400 text-sm mb-2">Smart Money Flow</p>
-              <h2 class="text-3xl font-black text-emerald-400">Bullish</h2>
+            <div class="glass rounded-2xl p-4 sm:p-5">
+              <p class="text-slate-400 text-xs sm:text-sm mb-2">Smart Money Flow</p>
+              <h2 id="dashboardSmartMoney" class="text-2xl sm:text-3xl font-black text-emerald-400">Bullish</h2>
             </div>
           </div>
 
@@ -264,300 +187,535 @@
   </section>
 
   <!-- FEATURES -->
-  <section class="px-8 lg:px-20 py-16">
+  <section class="features-section px-4 sm:px-8 lg:px-20 py-12 sm:py-16">
+    <div class="max-w-[1400px] mx-auto">
 
-    <div class="text-center mb-16">
-      <h2 class="text-5xl font-black mb-6">
-        Advanced AI Trading Features
-      </h2>
+      <div class="text-center mb-10 sm:mb-16">
+        <h2 class="section-title text-3xl sm:text-4xl lg:text-5xl font-black mb-4 sm:mb-6">
+          Advanced AI Trading Features
+        </h2>
 
-      <p class="text-slate-400 max-w-3xl mx-auto text-lg">
-        Built for serious intraday traders using realtime machine learning, options intelligence, market breadth analysis, and institutional data tracking.
-      </p>
-    </div>
-
-    <div class="grid md:grid-cols-2 xl:grid-cols-4 gap-8">
-
-      <div class="glass rounded-3xl p-8 hover:-translate-y-2 transition-all duration-300 border border-slate-800 hover:border-emerald-500/40">
-        <div class="w-16 h-16 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-3xl mb-6">
-          📈
-        </div>
-
-        <h3 class="text-2xl font-bold mb-4">Realtime Scanner</h3>
-
-        <p class="text-slate-400 leading-relaxed">
-          AI continuously scans all stocks for breakout, momentum, volume expansion, and smart money movement.
+        <p class="section-text text-slate-400 max-w-3xl mx-auto text-base sm:text-lg">
+          Built for serious intraday traders using realtime machine learning, options intelligence, market breadth analysis, and institutional data tracking.
         </p>
       </div>
 
-      <div class="glass rounded-3xl p-8 hover:-translate-y-2 transition-all duration-300 border border-slate-800 hover:border-cyan-500/40">
-        <div class="w-16 h-16 rounded-2xl bg-cyan-500/20 flex items-center justify-center text-3xl mb-6">
-          🧠
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-8">
+
+        <div class="glass rounded-3xl p-6 sm:p-8 hover:-translate-y-2 transition-all duration-300 border border-slate-800 hover:border-emerald-500/40">
+          <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-2xl sm:text-3xl mb-6">
+            📈
+          </div>
+
+          <h3 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Realtime Scanner</h3>
+
+          <p class="text-slate-400 leading-relaxed text-sm sm:text-base">
+            AI continuously scans all stocks for breakout, momentum, volume expansion, and smart money movement.
+          </p>
         </div>
 
-        <h3 class="text-2xl font-bold mb-4">AI Prediction</h3>
+        <div class="glass rounded-3xl p-6 sm:p-8 hover:-translate-y-2 transition-all duration-300 border border-slate-800 hover:border-cyan-500/40">
+          <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-cyan-500/20 flex items-center justify-center text-2xl sm:text-3xl mb-6">
+            🧠
+          </div>
 
-        <p class="text-slate-400 leading-relaxed">
-          Deep learning models predict bullish and bearish probabilities before major market moves.
-        </p>
-      </div>
+          <h3 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">AI Prediction</h3>
 
-      <div class="glass rounded-3xl p-8 hover:-translate-y-2 transition-all duration-300 border border-slate-800 hover:border-purple-500/40">
-        <div class="w-16 h-16 rounded-2xl bg-purple-500/20 flex items-center justify-center text-3xl mb-6">
-          🔥
+          <p class="text-slate-400 leading-relaxed text-sm sm:text-base">
+            Deep learning models predict bullish and bearish probabilities before major market moves.
+          </p>
         </div>
 
-        <h3 class="text-2xl font-bold mb-4">Market Heatmap</h3>
+        <div class="glass rounded-3xl p-6 sm:p-8 hover:-translate-y-2 transition-all duration-300 border border-slate-800 hover:border-purple-500/40">
+          <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-purple-500/20 flex items-center justify-center text-2xl sm:text-3xl mb-6">
+            🔥
+          </div>
 
-        <p class="text-slate-400 leading-relaxed">
-          Sector-wise heatmaps reveal strongest bullish and bearish sectors instantly.
-        </p>
-      </div>
+          <h3 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Market Heatmap</h3>
 
-      <div class="glass rounded-3xl p-8 hover:-translate-y-2 transition-all duration-300 border border-slate-800 hover:border-red-500/40">
-        <div class="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center text-3xl mb-6">
-          ⚡
+          <p class="text-slate-400 leading-relaxed text-sm sm:text-base">
+            Sector-wise heatmaps reveal strongest bullish and bearish sectors instantly.
+          </p>
         </div>
 
-        <h3 class="text-2xl font-bold mb-4">Instant Signals</h3>
+        <div class="glass rounded-3xl p-6 sm:p-8 hover:-translate-y-2 transition-all duration-300 border border-slate-800 hover:border-red-500/40">
+          <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-red-500/20 flex items-center justify-center text-2xl sm:text-3xl mb-6">
+            ⚡
+          </div>
 
-        <p class="text-slate-400 leading-relaxed">
-          Realtime entry, exit, stoploss, and target alerts using AI-generated trading strategies.
-        </p>
+          <h3 class="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Instant Signals</h3>
+
+          <p class="text-slate-400 leading-relaxed text-sm sm:text-base">
+            Realtime entry, exit, stoploss, and target alerts using AI-generated trading strategies.
+          </p>
+        </div>
+
       </div>
-
     </div>
   </section>
+  </div>
 
   <!-- HEATMAP -->
-  <section class="px-8 lg:px-20 py-16">
+  <div id="tab-heatmap" class="tab-content hidden">
+  <section class="heatmap-section px-4 sm:px-8 lg:px-20 py-12 sm:py-16">
+    <div class="max-w-[1400px] mx-auto">
 
-    <div class="flex items-center justify-between mb-10 flex-wrap gap-4">
-      <div>
-        <h2 class="text-4xl font-black">Market Heatmap</h2>
-        <p class="text-slate-400 mt-2">Realtime Sector Strength Analysis</p>
-      </div>
-
-      <div class="flex gap-3">
-        <button class="bg-emerald-500/20 text-emerald-400 px-5 py-2 rounded-xl font-bold border border-emerald-500/20">
-          Bullish
-        </button>
-
-        <button class="bg-red-500/20 text-red-400 px-5 py-2 rounded-xl font-bold border border-red-500/20">
-          Bearish
-        </button>
-      </div>
-    </div>
-
-    <div class="grid md:grid-cols-3 lg:grid-cols-5 gap-5">
-
-      <div class="heat-green rounded-3xl p-8 h-48 flex flex-col justify-between glow-green">
+      <div class="flex items-center justify-between mb-8 sm:mb-10 flex-wrap gap-4">
         <div>
-          <p class="text-sm text-white/70">Banking</p>
-          <h2 class="text-3xl font-black mt-2">BANKNIFTY</h2>
-        </div>
-
-        <div>
-          <h3 class="text-5xl font-black">+3.8%</h3>
-          <p class="text-sm mt-2">Strong Bullish Momentum</p>
+          <h2 class="section-title text-3xl sm:text-4xl font-black">Market Heatmap</h2>
+          <p class="section-text text-slate-400 mt-2 text-sm sm:text-base">Realtime Sector Strength & Sentiment Tracking</p>
         </div>
       </div>
 
-      <div class="heat-red rounded-3xl p-8 h-48 flex flex-col justify-between glow-red">
-        <div>
-          <p class="text-sm text-white/70">IT Sector</p>
-          <h2 class="text-3xl font-black mt-2">INFOTECH</h2>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Left Side: Sentiment & Rotation -->
+        <div class="lg:col-span-1">
+          <div id="marketSentiment">
+            <div class="p-10 text-center text-slate-400 glass rounded-3xl">Loading Market Sentiment...</div>
+          </div>
+          <div class="glass p-6 rounded-3xl border border-slate-800 mt-6">
+            <h3 class="font-bold text-lg mb-4 text-slate-300">Sector Strength Rotation</h3>
+            <div id="sectorRotation" class="flex flex-col gap-2">
+              <div class="p-5 text-center text-slate-400">Loading Sector Rotation...</div>
+            </div>
+          </div>
         </div>
 
-        <div>
-          <h3 class="text-5xl font-black">-1.9%</h3>
-          <p class="text-sm mt-2">Bearish Pressure</p>
-        </div>
-      </div>
+        <!-- Right Side: Heatmaps -->
+        <div class="lg:col-span-2 flex flex-col gap-8">
+          <div class="glass p-6 rounded-3xl border border-slate-800">
+            <h3 class="font-bold text-lg mb-4 text-slate-300">Sector Strength Map</h3>
+            <div id="sectorHeatmap" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div class="p-10 text-center text-slate-400 col-span-full">Loading Sector Heatmap...</div>
+            </div>
+          </div>
 
-      <div class="heat-green rounded-3xl p-8 h-48 flex flex-col justify-between">
-        <div>
-          <p class="text-sm text-white/70">Auto</p>
-          <h2 class="text-3xl font-black mt-2">AUTO</h2>
-        </div>
-
-        <div>
-          <h3 class="text-5xl font-black">+2.6%</h3>
-          <p class="text-sm mt-2">Volume Expansion</p>
-        </div>
-      </div>
-
-      <div class="heat-neutral rounded-3xl p-8 h-48 flex flex-col justify-between">
-        <div>
-          <p class="text-sm text-white/70">Pharma</p>
-          <h2 class="text-3xl font-black mt-2">PHARMA</h2>
-        </div>
-
-        <div>
-          <h3 class="text-5xl font-black">0.2%</h3>
-          <p class="text-sm mt-2">Sideways</p>
-        </div>
-      </div>
-
-      <div class="heat-green rounded-3xl p-8 h-48 flex flex-col justify-between">
-        <div>
-          <p class="text-sm text-white/70">Metals</p>
-          <h2 class="text-3xl font-black mt-2">METALS</h2>
-        </div>
-
-        <div>
-          <h3 class="text-5xl font-black">+4.1%</h3>
-          <p class="text-sm mt-2">AI Breakout Detected</p>
+          <div class="glass p-6 rounded-3xl border border-slate-800">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h3 class="font-bold text-lg text-slate-300 flex items-center gap-2">
+                Stock Momentum Map
+                <span id="selectedSectorBadge" class="hidden text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full font-bold"></span>
+              </h3>
+              <button id="clearSectorFilter" class="hidden text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition-colors font-medium">Clear Filter</button>
+            </div>
+            <div id="stockHeatmap" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              <div class="p-10 text-center text-slate-400 col-span-full">Loading Stock Heatmap...</div>
+            </div>
+          </div>
         </div>
       </div>
 
     </div>
   </section>
+  </div>
 
   <!-- SIGNALS -->
-  <section class="px-8 lg:px-20 py-16">
+  <div id="tab-signals" class="tab-content hidden">
+  <section class="signals-section px-4 sm:px-8 lg:px-20 py-12 sm:py-16">
+    <div class="max-w-[1400px] mx-auto">
 
-    <div class="flex items-center justify-between mb-10 flex-wrap gap-4">
-      <div>
-        <h2 class="text-4xl font-black">Live AI Signals</h2>
-        <p class="text-slate-400 mt-2">Institutional Grade Signal Detection</p>
+      <div class="flex items-center justify-between mb-8 sm:mb-10 flex-wrap gap-4">
+        <div>
+          <h2 class="section-title text-3xl sm:text-4xl font-black">Live AI Signals</h2>
+          <p class="section-text text-slate-400 mt-2 text-sm sm:text-base">Institutional Grade Signal Detection</p>
+        </div>
+
+        <button id="btn-view-all-signals" class="bg-gradient-to-r from-cyan-500 to-purple-500 px-5 py-2.5 sm:px-6 sm:py-3 rounded-xl font-bold hover:scale-105 transition-all text-sm sm:text-base">
+          View All Signals
+        </button>
       </div>
 
-      <button class="bg-gradient-to-r from-cyan-500 to-purple-500 px-6 py-3 rounded-xl font-bold hover:scale-105 transition-all">
-        View All Signals
-      </button>
-    </div>
-
-    <div class="overflow-hidden rounded-3xl border border-slate-800 glass">
-
-      <table class="w-full">
-        <thead>
-          <tr class="bg-white/5 text-left text-slate-300 text-sm">
-            <th class="p-5">Stock</th>
-            <th class="p-5">Signal</th>
-            <th class="p-5">Entry</th>
-            <th class="p-5">Target</th>
-            <th class="p-5">Stoploss</th>
-            <th class="p-5">AI Strength</th>
-            <th class="p-5">Status</th>
-          </tr>
-        </thead>
-
-        <tbody>
-
-          <tr class="border-t border-slate-800 hover:bg-white/5 transition-all">
-            <td class="p-5 font-bold">RELIANCE</td>
-            <td class="p-5 text-emerald-400 font-bold">BUY</td>
-            <td class="p-5">2984.50</td>
-            <td class="p-5">3020.00</td>
-            <td class="p-5">2961.00</td>
-            <td class="p-5 text-cyan-400">91%</td>
-            <td class="p-5">
-              <span class="bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-xl text-sm font-bold">
-                ACTIVE
-              </span>
-            </td>
-          </tr>
-
-          <tr class="border-t border-slate-800 hover:bg-white/5 transition-all">
-            <td class="p-5 font-bold">HDFCBANK</td>
-            <td class="p-5 text-red-400 font-bold">SELL</td>
-            <td class="p-5">1688.20</td>
-            <td class="p-5">1662.00</td>
-            <td class="p-5">1701.00</td>
-            <td class="p-5 text-cyan-400">84%</td>
-            <td class="p-5">
-              <span class="bg-red-500/20 text-red-400 px-4 py-2 rounded-xl text-sm font-bold">
-                ACTIVE
-              </span>
-            </td>
-          </tr>
-
-          <tr class="border-t border-slate-800 hover:bg-white/5 transition-all">
-            <td class="p-5 font-bold">TATASTEEL</td>
-            <td class="p-5 text-emerald-400 font-bold">BUY</td>
-            <td class="p-5">172.10</td>
-            <td class="p-5">180.00</td>
-            <td class="p-5">168.00</td>
-            <td class="p-5 text-cyan-400">88%</td>
-            <td class="p-5">
-              <span class="bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-xl text-sm font-bold">
-                ACTIVE
-              </span>
-            </td>
-          </tr>
-
-        </tbody>
-      </table>
-
+      <div id="strategySignals" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="p-10 text-center text-slate-400 col-span-full">Loading AI Live Signals...</div>
+      </div>
     </div>
   </section>
+  </div>
+
+  <div id="tab-scanner" class="tab-content hidden">
+    <section class="scanner-section px-4 sm:px-8 lg:px-20 py-12 sm:py-16">
+      <div class="max-w-[1400px] mx-auto">
+        <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <div>
+            <h2 class="section-title text-3xl sm:text-4xl font-black">AI Live Scanner</h2>
+            <p class="section-text text-slate-400 mt-2 text-sm sm:text-base">Realtime breakout ratings, reversal alerts, and swing spectrum</p>
+          </div>
+        </div>
+
+        <div class="flex border-b border-slate-800 mb-8 gap-2 flex-wrap">
+          <button id="subtab-scanner-btn" onclick="switchScannerSubTab('scanner')" class="py-2.5 px-4 font-bold text-sm border-b-2 border-emerald-400 text-emerald-400 transition-colors">Stock Scanner</button>
+          <button id="subtab-swing-btn" onclick="switchScannerSubTab('swing')" class="py-2.5 px-4 font-bold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors">Swing Spectrum</button>
+        </div>
+
+        <!-- SUB-TAB 1: STOCK SCANNER -->
+        <div id="scanner-view-default" class="scanner-sub-content">
+          <div class="overflow-x-auto rounded-3xl border border-slate-800 glass">
+            <table class="w-full min-w-[700px] md:min-w-full">
+              <thead>
+                <tr class="bg-white/5 text-left text-slate-300 text-sm">
+                  <th class="p-4 sm:p-5">Stock Symbol</th>
+                  <th class="p-4 sm:p-5">Last Price</th>
+                  <th class="p-4 sm:p-5">% Change</th>
+                  <th class="p-4 sm:p-5">Volume</th>
+                  <th class="p-4 sm:p-5">Breakout Rating</th>
+                </tr>
+              </thead>
+              <tbody id="scannerTableBody">
+                <tr class="border-t border-slate-800"><td colspan="5" class="p-5 text-center text-slate-400">Loading live scanner data...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 2: SWING SPECTRUM -->
+        <div id="scanner-view-swing" class="scanner-sub-content hidden">
+          <div class="grid lg:grid-cols-3 gap-6">
+            <!-- REVERSAL RADAR -->
+            <div class="glass p-6 rounded-3xl border border-slate-800">
+              <h3 class="font-bold text-lg text-slate-300 mb-4 flex items-center justify-between">
+                Reversal Radar
+                <span class="text-xs bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded-full font-bold">RSI Divergence</span>
+              </h3>
+              <div class="overflow-y-auto max-h-[400px]">
+                <table class="w-full text-left text-xs font-semibold">
+                  <thead>
+                    <tr class="text-slate-400 uppercase border-b border-slate-800">
+                      <th class="pb-2">Stock</th>
+                      <th class="pb-2">Price</th>
+                      <th class="pb-2">RSI</th>
+                      <th class="pb-2">Signal</th>
+                    </tr>
+                  </thead>
+                  <tbody id="reversalRadarTableBody" class="text-slate-200">
+                    <tr>
+                      <td colspan="4" class="py-4 text-center text-slate-500">Loading reversal signals...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- CHANNEL BREAKOUT -->
+            <div class="glass p-6 rounded-3xl border border-slate-800">
+              <h3 class="font-bold text-lg text-slate-300 mb-4 flex items-center justify-between">
+                Channel Breakout
+                <span class="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">Consolidation</span>
+              </h3>
+              <div class="overflow-y-auto max-h-[400px]">
+                <table class="w-full text-left text-xs font-semibold">
+                  <thead>
+                    <tr class="text-slate-400 uppercase border-b border-slate-800">
+                      <th class="pb-2">Stock</th>
+                      <th class="pb-2">Price</th>
+                      <th class="pb-2">Range</th>
+                      <th class="pb-2">BO Volume</th>
+                    </tr>
+                  </thead>
+                  <tbody id="channelBreakoutTableBody" class="text-slate-200">
+                    <tr>
+                      <td colspan="4" class="py-4 text-center text-slate-500">Loading breakouts...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- DELIVERY ACCUMULATION -->
+            <div class="glass p-6 rounded-3xl border border-slate-800">
+              <h3 class="font-bold text-lg text-slate-300 mb-4 flex items-center justify-between">
+                Delivery Scanner
+                <span class="text-xs bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">Accumulation</span>
+              </h3>
+              <div class="overflow-y-auto max-h-[400px]">
+                <table class="w-full text-left text-xs font-semibold">
+                  <thead>
+                    <tr class="text-slate-400 uppercase border-b border-slate-800">
+                      <th class="pb-2">Stock</th>
+                      <th class="pb-2">Price</th>
+                      <th class="pb-2">Delivery %</th>
+                      <th class="pb-2">Vol Ratio</th>
+                    </tr>
+                  </thead>
+                  <tbody id="deliveryScannerTableBody" class="text-slate-200">
+                    <tr>
+                      <td colspan="4" class="py-4 text-center text-slate-500">Loading delivery data...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <div id="tab-options" class="tab-content hidden">
+    <section class="options-section px-4 sm:px-8 lg:px-20 py-12 sm:py-16">
+      <div class="max-w-[1400px] mx-auto">
+        <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <div>
+            <h2 class="section-title text-3xl sm:text-4xl font-black">Derivatives Workspace</h2>
+            <p class="section-text text-slate-400 mt-2 text-sm sm:text-base">Realtime option chain, operator accumulation, and Open Interest clocks</p>
+          </div>
+        </div>
+
+        <div class="flex border-b border-slate-800 mb-8 gap-2 flex-wrap">
+          <button id="subtab-optionchain-btn" onclick="switchOptionsSubTab('optionchain')" class="py-2.5 px-4 font-bold text-sm border-b-2 border-emerald-400 text-emerald-400 transition-colors">Options Chain</button>
+          <button id="subtab-optionapex-btn" onclick="switchOptionsSubTab('optionapex')" class="py-2.5 px-4 font-bold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors">Option Apex (Operator Tracker)</button>
+          <button id="subtab-optionclock-btn" onclick="switchOptionsSubTab('optionclock')" class="py-2.5 px-4 font-bold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors">Option Clock (OI Timing Dial)</button>
+        </div>
+
+        <!-- SUB-TAB 1: OPTIONS CHAIN -->
+        <div id="options-view-chain" class="options-sub-content">
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+            <div class="glass p-5 rounded-2xl border border-slate-800">
+              <p class="text-slate-400 text-xs sm:text-sm">Market Bias</p>
+              <div id="marketBias" class="text-xl font-bold mt-2 text-emerald-400">-</div>
+            </div>
+            <div class="glass p-5 rounded-2xl border border-slate-800">
+              <p class="text-slate-400 text-xs sm:text-sm">PCR Ratio</p>
+              <div id="pcrValue" class="text-xl font-bold mt-2 text-cyan-400">-</div>
+            </div>
+            <div class="glass p-5 rounded-2xl border border-slate-800">
+              <p class="text-slate-400 text-xs sm:text-sm">Max Pain Strike</p>
+              <div id="maxPain" class="text-xl font-bold mt-2 text-purple-400">-</div>
+            </div>
+            <div class="glass p-5 rounded-2xl border border-slate-800">
+              <p class="text-slate-400 text-xs sm:text-sm">Net Gamma Exposure</p>
+              <div id="gammaExposure" class="text-xl font-bold mt-2 text-yellow-400">-</div>
+            </div>
+            <div class="glass p-5 rounded-2xl border border-slate-800 col-span-2 md:col-span-1">
+              <p class="text-slate-400 text-xs sm:text-sm">IV Volatility State</p>
+              <div id="ivState" class="text-xl font-bold mt-2 text-emerald-400">-</div>
+            </div>
+          </div>
+          <div class="flex justify-between items-center px-6 py-4 bg-white/5 rounded-2xl mb-4 font-bold border border-slate-800 text-sm">
+            <div class="text-emerald-400 flex-1 text-center">CALL OPTIONS (CE)</div>
+            <div class="text-cyan-400 w-[100px] text-center">STRIKE</div>
+            <div class="text-red-400 flex-1 text-center">PUT OPTIONS (PE)</div>
+          </div>
+          <div id="optionChainTable" class="flex flex-col gap-2">
+            <div class="p-10 text-center text-slate-400 glass rounded-2xl">Loading live NIFTY options chain...</div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 2: OPTION APEX -->
+        <div id="options-view-apex" class="options-sub-content hidden">
+          <div class="grid md:grid-cols-3 gap-6 mb-8">
+            <div class="glass p-6 rounded-3xl border border-slate-800 flex flex-col items-center justify-center text-center">
+              <h3 class="font-bold text-lg text-slate-300 mb-4">Operator Bias Gauge</h3>
+              <div class="relative w-40 h-40 flex items-center justify-center rounded-full border-4 border-slate-800">
+                <div id="apexGaugeNeedle" class="absolute w-2 h-20 bg-emerald-400 origin-bottom bottom-20 transition-transform duration-500 rounded-full" style="transform: rotate(0deg);"></div>
+                <div id="apexGaugeValue" class="absolute bottom-4 font-black text-xl text-emerald-400">NEUTRAL</div>
+              </div>
+              <p class="text-slate-500 text-xs mt-4">Realtime writing ratio of operators (ATM Strikes)</p>
+            </div>
+            
+            <div class="glass p-6 rounded-3xl border border-slate-800 col-span-2 flex flex-col justify-between">
+              <div>
+                <h3 class="font-bold text-lg text-slate-300 mb-4">OI Accumulation Speed</h3>
+                <div class="relative w-full bg-slate-800 h-6 rounded-full overflow-hidden mb-2">
+                  <div id="apexAccumulationFill" class="bg-gradient-to-r from-emerald-500 to-cyan-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between text-xs text-slate-400 font-medium">
+                  <span>Normal Accumulation</span>
+                  <span id="apexAccumulationValue" class="text-cyan-400 font-bold">0.0% / min</span>
+                  <span>Extreme Building</span>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-2 gap-4 mt-6">
+                <div class="bg-white/5 p-4 rounded-2xl border border-slate-800">
+                  <span class="text-xs text-slate-400">Total Call Writing (OI)</span>
+                  <div id="apexTotalCallOI" class="text-lg font-black text-slate-200 mt-1">-</div>
+                </div>
+                <div class="bg-white/5 p-4 rounded-2xl border border-slate-800">
+                  <span class="text-xs text-slate-400">Total Put Writing (OI)</span>
+                  <div id="apexTotalPutOI" class="text-lg font-black text-slate-200 mt-1">-</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="glass p-6 rounded-3xl border border-slate-800">
+            <h3 class="font-bold text-lg text-slate-300 mb-4">Operator Sentiment Breakdown</h3>
+            <div class="grid sm:grid-cols-3 gap-6">
+              <div class="bg-emerald-500/5 p-5 rounded-2xl border border-emerald-500/10">
+                <span class="text-xs text-emerald-400 font-bold uppercase tracking-wider">Call Writing Change</span>
+                <div id="apexCallWriteChange" class="text-xl font-bold mt-1 text-emerald-300">-</div>
+              </div>
+              <div class="bg-red-500/5 p-5 rounded-2xl border border-red-500/10">
+                <span class="text-xs text-red-400 font-bold uppercase tracking-wider">Put Writing Change</span>
+                <div id="apexPutWriteChange" class="text-xl font-bold mt-1 text-red-300">-</div>
+              </div>
+              <div class="bg-cyan-500/5 p-5 rounded-2xl border border-cyan-500/10">
+                <span class="text-xs text-cyan-400 font-bold uppercase tracking-wider">PCR Crossover Status</span>
+                <div id="apexPCRCrossStatus" class="text-xl font-bold mt-1 text-cyan-300">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 3: OPTION CLOCK -->
+        <div id="options-view-clock" class="options-sub-content hidden">
+          <div class="grid md:grid-cols-3 gap-6 mb-8">
+            <div class="glass p-6 rounded-3xl border border-slate-800 flex flex-col items-center justify-center text-center">
+              <h3 class="font-bold text-lg text-slate-300 mb-4">OI Time Dial</h3>
+              <div class="relative w-40 h-40 flex items-center justify-center rounded-full border-4 border-slate-800 bg-slate-900/50">
+                <div id="clockNeedle" class="absolute w-1 h-18 bg-cyan-400 origin-bottom bottom-20 transition-transform duration-500 rounded-full" style="transform: rotate(0deg);"></div>
+                <div id="clockTimeWindow" class="absolute bottom-4 font-black text-sm text-cyan-400 uppercase tracking-widest">MORNING RUSH</div>
+              </div>
+              <p class="text-slate-500 text-xs mt-4">Tracks OI change distribution by trading hours</p>
+            </div>
+            
+            <div class="glass p-6 rounded-3xl border border-slate-800 col-span-2">
+              <h3 class="font-bold text-lg text-slate-300 mb-4">15-Min OI Build Snapshots</h3>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                  <thead>
+                    <tr class="text-slate-400 text-xs uppercase border-b border-slate-800">
+                      <th class="pb-3">Timestamp</th>
+                      <th class="pb-3">CE OI Change</th>
+                      <th class="pb-3">PE OI Change</th>
+                      <th class="pb-3">Interpretation</th>
+                    </tr>
+                  </thead>
+                  <tbody id="optionClockTableBody" class="text-sm font-medium text-slate-200">
+                    <tr>
+                      <td colspan="4" class="py-4 text-center text-slate-500">Loading snapshots...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <!-- BACKTESTING TAB -->
+  <div id="tab-backtest" class="tab-content hidden">
+    <section class="backtest-section px-4 sm:px-8 lg:px-20 py-12 sm:py-16">
+      <div class="max-w-[1400px] mx-auto">
+        <div class="flex items-center justify-between mb-8 sm:mb-10 flex-wrap gap-4">
+          <div>
+            <h2 class="section-title text-3xl sm:text-4xl font-black">AI Backtesting Report</h2>
+            <p class="section-text text-slate-400 mt-2 text-sm sm:text-base">LSTM model backtesting performance logs (NIFTY historical data)</p>
+          </div>
+        </div>
+        <div class="grid md:grid-cols-3 gap-6 mb-8">
+          <div class="glass p-6 rounded-2xl border border-slate-800">
+            <h3 class="text-slate-400 text-sm">Win Rate</h3>
+            <h2 class="text-4xl font-black text-emerald-400 mt-2">78.4%</h2>
+            <p class="text-xs text-emerald-400/80 mt-1">▲ 2.4% vs last version</p>
+          </div>
+          <div class="glass p-6 rounded-2xl border border-slate-800">
+            <h3 class="text-slate-400 text-sm">Profit Factor</h3>
+            <h2 class="text-4xl font-black text-cyan-400 mt-2">2.41</h2>
+            <p class="text-xs text-slate-400 mt-1">Excellent trading efficiency</p>
+          </div>
+          <div class="glass p-6 rounded-2xl border border-slate-800">
+            <h3 class="text-slate-400 text-sm">Max Drawdown</h3>
+            <h2 class="text-4xl font-black text-purple-400 mt-2">4.82%</h2>
+            <p class="text-xs text-purple-400/80 mt-1">Conservative risk profile</p>
+          </div>
+        </div>
+        <div class="glass rounded-3xl p-6 border border-slate-800">
+          <h3 class="font-bold text-lg mb-4">Historical Trade Performance Log</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-slate-300 text-sm">
+              <thead>
+                <tr class="bg-white/5 font-bold border-b border-slate-800">
+                  <th class="p-3">Period</th>
+                  <th class="p-3">Trades</th>
+                  <th class="p-3">Won</th>
+                  <th class="p-3">Lost</th>
+                  <th class="p-3">Net Profit</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-b border-slate-800/50"><td class="p-3">June 2026</td><td class="p-3">42</td><td class="p-3 text-emerald-400">33</td><td class="p-3 text-red-400">9</td><td class="p-3 text-emerald-400 font-bold">+18.4%</td></tr>
+                <tr class="border-b border-slate-800/50"><td class="p-3">May 2026</td><td class="p-3">50</td><td class="p-3 text-emerald-400">40</td><td class="p-3 text-red-400">10</td><td class="p-3 text-emerald-400 font-bold">+22.1%</td></tr>
+                <tr class="border-b border-slate-800/50"><td class="p-3">April 2026</td><td class="p-3">38</td><td class="p-3 text-emerald-400">29</td><td class="p-3 text-red-400">9</td><td class="p-3 text-emerald-400 font-bold">+14.8%</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
 
   <!-- FOOTER -->
-  <footer class="px-8 lg:px-20 py-14 border-t border-slate-800 mt-20">
+  <footer class="px-4 sm:px-8 lg:px-20 py-10 sm:py-14 border-t border-slate-800 mt-12 sm:mt-20">
+    <div class="max-w-[1400px] mx-auto">
 
-    <div class="grid lg:grid-cols-4 gap-12">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
 
-      <div>
-        <div class="flex items-center gap-4 mb-5">
-          <div class="w-12 h-12 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 flex items-center justify-center text-black font-black text-xl">
-            TF
+        <div>
+          <div class="flex items-center gap-4 mb-4 sm:mb-5">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 flex items-center justify-center text-black font-black text-xl">
+              TF
+            </div>
+
+            <div>
+              <h2 class="text-xl sm:text-2xl font-black">TradeFinder AI</h2>
+            </div>
           </div>
 
-          <div>
-            <h2 class="text-2xl font-black">TradeFinder AI</h2>
+          <p class="text-slate-400 leading-relaxed text-sm sm:text-base">
+            Advanced AI intraday trading intelligence platform for realtime market prediction.
+          </p>
+        </div>
+
+        <div>
+          <h3 class="font-bold text-lg sm:text-xl mb-4 sm:mb-5">Platform</h3>
+
+          <div class="space-y-2 sm:space-y-3 text-slate-400 text-sm sm:text-base">
+            <p class="hover:text-emerald-400 transition cursor-pointer">AI Scanner</p>
+            <p class="hover:text-emerald-400 transition cursor-pointer">Realtime Signals</p>
+            <p class="hover:text-emerald-400 transition cursor-pointer">Options Chain</p>
+            <p class="hover:text-emerald-400 transition cursor-pointer">Market Heatmap</p>
           </div>
         </div>
 
-        <p class="text-slate-400 leading-relaxed">
-          Advanced AI intraday trading intelligence platform for realtime market prediction.
-        </p>
+        <div>
+          <h3 class="font-bold text-lg sm:text-xl mb-4 sm:mb-5">AI Features</h3>
+
+          <div class="space-y-2 sm:space-y-3 text-slate-400 text-sm sm:text-base">
+            <p class="hover:text-emerald-400 transition cursor-pointer">LSTM Prediction</p>
+            <p class="hover:text-emerald-400 transition cursor-pointer">Momentum Detection</p>
+            <p class="hover:text-emerald-400 transition cursor-pointer">Smart Money Flow</p>
+            <p class="hover:text-emerald-400 transition cursor-pointer">Pattern Recognition</p>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="font-bold text-lg sm:text-xl mb-4 sm:mb-5">Contact</h3>
+
+          <div class="space-y-2 sm:space-y-3 text-slate-400 text-sm sm:text-base">
+            <p>support@tradefinder.ai</p>
+            <p>India Market Support</p>
+            <p>24/7 AI Monitoring</p>
+          </div>
+        </div>
+
       </div>
 
-      <div>
-        <h3 class="font-bold text-xl mb-5">Platform</h3>
-
-        <div class="space-y-3 text-slate-400">
-          <p>AI Scanner</p>
-          <p>Realtime Signals</p>
-          <p>Options Chain</p>
-          <p>Market Heatmap</p>
-        </div>
-      </div>
-
-      <div>
-        <h3 class="font-bold text-xl mb-5">AI Features</h3>
-
-        <div class="space-y-3 text-slate-400">
-          <p>LSTM Prediction</p>
-          <p>Momentum Detection</p>
-          <p>Smart Money Flow</p>
-          <p>Pattern Recognition</p>
-        </div>
-      </div>
-
-      <div>
-        <h3 class="font-bold text-xl mb-5">Contact</h3>
-
-        <div class="space-y-3 text-slate-400">
-          <p>support@tradefinder.ai</p>
-          <p>India Market Support</p>
-          <p>24/7 AI Monitoring</p>
-        </div>
+      <div class="border-t border-slate-800 mt-10 sm:mt-12 pt-6 sm:pt-8 text-center text-slate-500 text-xs sm:text-sm">
+        © 2026 TradeFinder AI. All Rights Reserved by amit sir.
       </div>
 
     </div>
-
-    <div class="border-t border-slate-800 mt-12 pt-8 text-center text-slate-500">
-      © 2026 TradeFinder AI. All Rights Reserved by amit sir.
-    </div>
-
   </footer>
 
   <script>
     const ctx = document.getElementById('marketChart');
 
-    new Chart(ctx, {
+    window.marketChartInstance = new Chart(ctx, {
       type: 'line',
       data: {
         labels: ['9:15','10:00','10:45','11:30','12:15','1:00','1:45','2:30','3:15'],
@@ -575,6 +733,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: {
             display: false
@@ -602,25 +761,334 @@
     });
   </script>
 
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const menuBtn = document.getElementById('menu-btn');
+      const mobileMenu = document.getElementById('mobile-menu');
+      const menuIconOpen = document.getElementById('menu-icon-open');
+      const menuIconClose = document.getElementById('menu-icon-close');
 
-<script src="api.js"></script>
+      if (menuBtn && mobileMenu) {
+        menuBtn.addEventListener('click', () => {
+          mobileMenu.classList.toggle('hidden');
+          menuIconOpen.classList.toggle('hidden');
+          menuIconClose.classList.toggle('hidden');
+        });
 
-<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-<script src="chart.js"></script>
+        // Close menu on link click
+        const mobileLinks = mobileMenu.querySelectorAll('a, button');
+        mobileLinks.forEach(link => {
+          link.addEventListener('click', () => {
+            mobileMenu.classList.add('hidden');
+            menuIconOpen.classList.remove('hidden');
+            menuIconClose.classList.add('hidden');
+          });
+        });
+      }
+    });
+  </script>
 
-<script src="options.js"></script>
-<script src="strategy.js"></script>
-<script src="indicator.js"></script>
-<script src="heatmap.js"></script>
-<script src="alerts.js"></script>
+  <!-- TAB SWITCHING AND DYNAMIC DATA LOADING -->
+  <script>
+    window.switchOptionsSubTab = function(subTabId) {
+      document.querySelectorAll('.options-sub-content').forEach(el => {
+        el.classList.add('hidden');
+      });
+      const activeView = document.getElementById(`options-view-${subTabId}`);
+      if (activeView) activeView.classList.remove('hidden');
 
+      const buttons = {
+        'optionchain': 'subtab-optionchain-btn',
+        'optionapex': 'subtab-optionapex-btn',
+        'optionclock': 'subtab-optionclock-btn'
+      };
+      Object.entries(buttons).forEach(([id, btnId]) => {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        if (id === subTabId) {
+          btn.className = 'py-2.5 px-4 font-bold text-sm border-b-2 border-emerald-400 text-emerald-400 transition-colors';
+        } else {
+          btn.className = 'py-2.5 px-4 font-bold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors';
+        }
+      });
 
+      if (subTabId === 'optionapex' && window.updateOptionApexLoop) {
+        window.updateOptionApexLoop();
+      } else if (subTabId === 'optionclock' && window.updateOptionClockLoop) {
+        window.updateOptionClockLoop();
+      }
+    };
 
+    window.switchScannerSubTab = function(subTabId) {
+      document.querySelectorAll('.scanner-sub-content').forEach(el => {
+        el.classList.add('hidden');
+      });
+      const activeView = document.getElementById(`scanner-view-${subTabId}`);
+      if (activeView) activeView.classList.remove('hidden');
 
+      const buttons = {
+        'scanner': 'subtab-scanner-btn',
+        'swing': 'subtab-swing-btn'
+      };
+      Object.entries(buttons).forEach(([id, btnId]) => {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        if (id === subTabId) {
+          btn.className = 'py-2.5 px-4 font-bold text-sm border-b-2 border-emerald-400 text-emerald-400 transition-colors';
+        } else {
+          btn.className = 'py-2.5 px-4 font-bold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-colors';
+        }
+      });
 
+      if (subTabId === 'swing' && window.updateSwingSpectrumLoop) {
+        window.updateSwingSpectrumLoop();
+      }
+    };
 
+    document.addEventListener('DOMContentLoaded', () => {
+      const tabLinks = document.querySelectorAll('.tab-link');
+      const tabContents = document.querySelectorAll('.tab-content');
 
+      function switchTab(tabId) {
+        // Toggle tab content display
+        tabContents.forEach(content => {
+          if (content.id === `tab-${tabId}`) {
+            content.classList.add('active');
+            content.style.display = 'block';
+          } else {
+            content.classList.remove('active');
+            content.style.display = 'none';
+          }
+        });
 
+        // Toggle active link styles
+        tabLinks.forEach(link => {
+          if (link.getAttribute('data-tab') === tabId) {
+            link.classList.add('text-emerald-400');
+            link.classList.remove('text-slate-300');
+          } else {
+            link.classList.remove('text-emerald-400');
+            link.classList.add('text-slate-300');
+          }
+        });
+
+        // Trigger dynamic tab load events
+        if (tabId === 'scanner') {
+          loadScannerData();
+          if (window.scannerInterval) clearInterval(window.scannerInterval);
+          window.scannerInterval = setInterval(loadScannerData, 5000);
+          switchScannerSubTab('scanner');
+        } else {
+          if (window.scannerInterval) {
+            clearInterval(window.scannerInterval);
+            window.scannerInterval = null;
+          }
+        }
+
+        if (tabId === 'options') {
+          switchOptionsSubTab('optionchain');
+        }
+      }
+
+      tabLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const tabId = link.getAttribute('data-tab');
+          switchTab(tabId);
+        });
+      });
+
+      // Fetch and load live scanner data
+      async function loadScannerData() {
+        const tbody = document.getElementById('scannerTableBody');
+        if (!tbody) return;
+        
+        try {
+          const res = await fetch('http://localhost:5000/api/market/scanner');
+          const data = await res.json();
+          
+          if (data && data.success && data.breakouts && data.breakouts.length > 0) {
+            tbody.innerHTML = '';
+            data.breakouts.forEach(stock => {
+              const changeColor = stock.pChange >= 0 ? 'text-emerald-400' : 'text-red-400';
+              const ratingGlow = stock.pChange > 2 ? 'glow-green' : '';
+              tbody.innerHTML += `
+                <tr class="border-t border-slate-800 hover:bg-white/5 transition-all">
+                  <td class="p-4 sm:p-5 font-bold">${stock.symbol}</td>
+                  <td class="p-4 sm:p-5 font-semibold">${stock.lastPrice.toFixed(2)}</td>
+                  <td class="p-4 sm:p-5 font-bold ${changeColor}">${stock.pChange >= 0 ? '+' : ''}${stock.pChange.toFixed(2)}%</td>
+                  <td class="p-4 sm:p-5 text-slate-400">${stock.totalTradedVolume.toLocaleString()}</td>
+                  <td class="p-4 sm:p-5">
+                    <span class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-xl text-xs font-bold ${ratingGlow}">
+                      BREAKOUT
+                    </span>
+                  </td>
+                </tr>
+              `;
+            });
+          } else {
+            tbody.innerHTML = '<tr class="border-t border-slate-800"><td colspan="5" class="p-5 text-center text-slate-400">No breakouts detected at the moment.</td></tr>';
+          }
+        } catch (err) {
+          console.error('Failed to load scanner:', err);
+          tbody.innerHTML = '<tr class="border-t border-slate-800"><td colspan="5" class="p-5 text-center text-red-400">Failed to connect to scanner API.</td></tr>';
+        }
+      }
+
+      // Bind other action buttons on the page
+      const startTradingBtn = document.getElementById('btn-start-trading');
+      if (startTradingBtn) {
+        startTradingBtn.addEventListener('click', () => switchTab('scanner'));
+      }
+
+      const watchDemoBtn = document.getElementById('btn-watch-demo');
+      if (watchDemoBtn) {
+        watchDemoBtn.addEventListener('click', () => switchTab('backtest'));
+      }
+
+      const viewAllSignalsBtn = document.getElementById('btn-view-all-signals');
+      if (viewAllSignalsBtn) {
+        viewAllSignalsBtn.addEventListener('click', () => switchTab('signals'));
+      }
+
+      const liveMarketBtns = document.querySelectorAll('.btn-live-market');
+      liveMarketBtns.forEach(btn => {
+        btn.addEventListener('click', () => switchTab('scanner'));
+      });
+
+      // Realtime Ticker and Dashboard Update function
+      async function updateDashboardAndTicker() {
+        try {
+          const statusRes = await fetch('http://localhost:5000/api/market/status');
+          const statusData = await statusRes.json();
+          
+          const scannerRes = await fetch('http://localhost:5000/api/market/scanner');
+          const scannerData = await scannerRes.json();
+          
+          const smRes = await fetch('http://localhost:5000/api/market/smart-money');
+          const smData = await smRes.json();
+
+          // Update Ticker
+          const tickerDiv = document.getElementById('liveTicker');
+          if (tickerDiv && statusData && statusData.success && statusData.market) {
+            const states = statusData.market.marketStates || [];
+            const niftyState = states.find(s => s.index === 'NIFTY 50') || {};
+            
+            let tickerHTML = '';
+            if (niftyState.last) {
+              const sign = niftyState.percentChange >= 0 ? '▲' : '▼';
+              const colorClass = niftyState.percentChange >= 0 ? 'text-emerald-400' : 'text-red-400';
+              tickerHTML += `<span class="${colorClass}">NIFTY 50 ${sign} ${niftyState.percentChange.toFixed(2)}% (${niftyState.last.toFixed(2)})</span> &nbsp;&nbsp;&nbsp; `;
+            }
+            
+            // Add top stocks from scanner
+            if (scannerData && scannerData.success && scannerData.breakouts) {
+              scannerData.breakouts.forEach(stock => {
+                const sign = stock.pChange >= 0 ? '▲' : '▼';
+                const colorClass = stock.pChange >= 0 ? 'text-emerald-400' : 'text-red-400';
+                tickerHTML += `<span class="${colorClass}">${stock.symbol} ${sign} ${stock.pChange.toFixed(2)}% (${stock.lastPrice.toFixed(2)})</span> &nbsp;&nbsp;&nbsp; `;
+              });
+            }
+            
+            if (smData && smData.success && smData.smartMoney && smData.smartMoney.pcr) {
+              const pcrVal = smData.smartMoney.pcr.pcr;
+              tickerHTML += `<span class="text-cyan-400">NIFTY PCR: ${pcrVal.toFixed(2)}</span> &nbsp;&nbsp;&nbsp;`;
+            }
+            
+            tickerDiv.innerHTML = tickerHTML;
+          }
+
+          // Update Dashboard Metrics
+          if (smData && smData.success && smData.smartMoney) {
+            const sm = smData.smartMoney;
+            const advances = sm.breadth.advances || 1;
+            const declines = sm.breadth.declines || 1;
+            const total = advances + declines;
+            const bullishStrength = Math.round((advances / total) * 100);
+            const bearishStrength = Math.round((declines / total) * 100);
+            
+            const bullishStrengthEl = document.getElementById('dashboardBullishStrength');
+            if (bullishStrengthEl) bullishStrengthEl.innerText = `${bullishStrength}%`;
+            
+            const bearishStrengthEl = document.getElementById('dashboardBearishStrength');
+            if (bearishStrengthEl) bearishStrengthEl.innerText = `${bearishStrength}%`;
+            
+            const momentumEl = document.getElementById('dashboardMomentumPrediction');
+            if (momentumEl) {
+              momentumEl.innerText = sm.pcr.interpretation || 'STRONG BUY';
+              if (sm.pcr.interpretation === 'BEARISH' || sm.pcr.interpretation === 'WEAK') {
+                momentumEl.className = 'text-red-400 font-bold text-xs sm:text-sm';
+              } else {
+                momentumEl.className = 'text-emerald-400 font-bold text-xs sm:text-sm';
+              }
+            }
+            
+            const smartMoneyEl = document.getElementById('dashboardSmartMoney');
+            if (smartMoneyEl) {
+              smartMoneyEl.innerText = sm.institutionalBias || 'Bullish';
+              if (sm.institutionalBias === 'BEARISH') {
+                smartMoneyEl.className = 'text-2xl sm:text-3xl font-black text-red-400';
+              } else {
+                smartMoneyEl.className = 'text-2xl sm:text-3xl font-black text-emerald-400';
+              }
+            }
+            
+            const volumeSpikeEl = document.getElementById('dashboardVolumeSpike');
+            if (volumeSpikeEl && scannerData && scannerData.success && scannerData.breakouts && scannerData.breakouts.length > 0) {
+              const topBreakout = scannerData.breakouts[0];
+              volumeSpikeEl.innerText = `+${topBreakout.pChange.toFixed(1)}%`;
+              
+              if (window.triggerBreakoutBeacon) {
+                window.triggerBreakoutBeacon(topBreakout.symbol, topBreakout.pChange);
+              }
+            }
+            
+            // Update Dashboard Chart line points dynamically
+            if (window.marketChartInstance && statusData && statusData.success && statusData.market) {
+              const states = statusData.market.marketStates || [];
+              const niftyState = states.find(s => s.index === 'NIFTY 50') || {};
+              if (niftyState.last) {
+                const dataLength = window.marketChartInstance.data.datasets[0].data.length;
+                window.marketChartInstance.data.datasets[0].data[dataLength - 1] = Math.round(niftyState.last % 100);
+                window.marketChartInstance.update();
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Failed to update dashboard/ticker:', err);
+        }
+      }
+
+      // Initialize Ticker and Dashboard Updates Loop (every 5 seconds)
+      updateDashboardAndTicker();
+      setInterval(updateDashboardAndTicker, 5000);
+
+      // Default active tab
+      switchTab('dashboard');
+    });
+  </script>
+
+  <!-- BREAKOUT BEACON TOAST CONTAINER -->
+  <div id="breakoutBeaconContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none w-80"></div>
+  <audio id="beaconAlertSound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav" preload="auto"></audio>
+
+  <script src="api.js"></script>
+  <script src="websocket.js"></script>
+  <script src="auth.js"></script>
+  <script src="scanner.js"></script>
+  <script src="screener.js"></script>
+  <script src="portfolio.js"></script>
+  <script src="execution.js"></script>
+  <script src="risk.js"></script>
+  <script src="ai-model.js"></script>
+  <script src="ai.js"></script>
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="chart.js"></script>
+  <script src="options.js"></script>
+  <script src="strategy.js"></script>
+  <script src="indicator.js"></script>
+  <script src="heatmap.js"></script>
+  <script src="alerts.js"></script>
 
 </body>
 </html>

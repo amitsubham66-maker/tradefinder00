@@ -707,7 +707,101 @@ class OptionsAI {
                 : "NEUTRAL"
         };
     }
+
+    static async updateOptionApex() {
+        try {
+            const res = await fetch("http://localhost:5000/api/market/option-apex/NIFTY");
+            const data = await res.json();
+            if (data && data.success) {
+                const needle = document.getElementById("apexGaugeNeedle");
+                const valueEl = document.getElementById("apexGaugeValue");
+                if (needle && valueEl) {
+                    let rotation = 0;
+                    if (data.operatorBias === "BULLISH") {
+                        rotation = 45;
+                        valueEl.className = "absolute bottom-4 font-black text-xl text-emerald-400";
+                    } else if (data.operatorBias === "BEARISH") {
+                        rotation = -45;
+                        valueEl.className = "absolute bottom-4 font-black text-xl text-red-400";
+                    } else {
+                        valueEl.className = "absolute bottom-4 font-black text-xl text-yellow-400";
+                    }
+                    needle.style.transform = `rotate(${rotation}deg)`;
+                    valueEl.innerText = data.operatorBias;
+                }
+
+                const progressFill = document.getElementById("apexAccumulationFill");
+                const speedVal = document.getElementById("apexAccumulationValue");
+                if (progressFill && speedVal) {
+                    progressFill.style.width = `${Math.min(100, data.accumulationRate * 6.5)}%`;
+                    speedVal.innerText = `${data.accumulationRate}% / min`;
+                }
+
+                const callOI = document.getElementById("apexTotalCallOI");
+                const putOI = document.getElementById("apexTotalPutOI");
+                if (callOI) callOI.innerText = data.callOIsum.toLocaleString();
+                if (putOI) putOI.innerText = data.putOIsum.toLocaleString();
+
+                const callChange = document.getElementById("apexCallWriteChange");
+                const putChange = document.getElementById("apexPutWriteChange");
+                const crossover = document.getElementById("apexPCRCrossStatus");
+                
+                if (callChange) {
+                    callChange.innerText = (data.operatorSentiment.callWritingChange >= 0 ? "+" : "") + data.operatorSentiment.callWritingChange.toLocaleString();
+                    callChange.className = "text-xl font-bold mt-1 " + (data.operatorSentiment.callWritingChange >= 0 ? "text-emerald-400" : "text-red-400");
+                }
+                if (putChange) {
+                    putChange.innerText = (data.operatorSentiment.putWritingChange >= 0 ? "+" : "") + data.operatorSentiment.putWritingChange.toLocaleString();
+                    putChange.className = "text-xl font-bold mt-1 " + (data.operatorSentiment.putWritingChange >= 0 ? "text-emerald-400" : "text-red-400");
+                }
+                if (crossover) {
+                    crossover.innerText = data.operatorSentiment.pcrCrossover;
+                    crossover.className = "text-xl font-bold mt-1 " + (data.operatorSentiment.pcrCrossover.includes("BULLISH") ? "text-emerald-400" : "text-red-400");
+                }
+            }
+        } catch (err) {
+            console.error("Failed to update Option Apex:", err);
+        }
+    }
+
+    static async updateOptionClock() {
+        try {
+            const res = await fetch("http://localhost:5000/api/market/option-clock/NIFTY");
+            const data = await res.json();
+            if (data && data.success && data.snapshots) {
+                const needle = document.getElementById("clockNeedle");
+                const timeWin = document.getElementById("clockTimeWindow");
+                if (needle && timeWin) {
+                    needle.style.transform = `rotate(${(Math.random() - 0.5) * 120}deg)`;
+                    timeWin.innerText = data.activeTimeWindow;
+                }
+
+                const body = document.getElementById("optionClockTableBody");
+                if (body) {
+                    body.innerHTML = data.snapshots.map(s => {
+                        let colorClass = "text-emerald-400";
+                        if (s.bias.includes("SHORT")) colorClass = "text-red-400";
+                        else if (s.bias.includes("UNWINDING")) colorClass = "text-yellow-400";
+                        
+                        return `
+                            <tr class="border-t border-slate-800/50">
+                                <td class="py-3 text-slate-400 font-bold">${s.time}</td>
+                                <td class="py-3 ${s.callOIChange >= 0 ? 'text-emerald-400' : 'text-red-400'}">${(s.callOIChange >= 0 ? '+' : '') + s.callOIChange.toLocaleString()}</td>
+                                <td class="py-3 ${s.putOIChange >= 0 ? 'text-emerald-400' : 'text-red-400'}">${(s.putOIChange >= 0 ? '+' : '') + s.putOIChange.toLocaleString()}</td>
+                                <td class="py-3 ${colorClass} font-bold">${s.bias}</td>
+                            </tr>
+                        `;
+                    }).join("");
+                }
+            }
+        } catch (err) {
+            console.error("Failed to update Option Clock:", err);
+        }
+    }
 }
+
+window.updateOptionApexLoop = () => OptionsEngine.updateOptionApex();
+window.updateOptionClockLoop = () => OptionsEngine.updateOptionClock();
 
 /* =========================================
    AUTO INITIALIZE

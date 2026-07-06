@@ -108,30 +108,8 @@ app.use(limiter);
    DATABASE CONNECTION
 ========================================= */
 
-mongoose.connect(MONGO_URI, {
-
-    useNewUrlParser: true,
-
-    useUnifiedTopology: true
-})
-
-.then(() => {
-
-    console.log(`
-    =========================================
-    MongoDB Connected
-    =========================================
-    `);
-
-})
-
-.catch(error => {
-
-    console.error(
-        "MongoDB Error:",
-        error
-    );
-});
+const { connectDatabase } = require("./backend/database");
+connectDatabase();
 
 /* =========================================
    HEALTH CHECK
@@ -233,100 +211,103 @@ io.on("connection", socket => {
 });
 
 /* =========================================
-   NSE MARKET STREAM
+   NSE MARKET STREAM (LIVE DATA)
 ========================================= */
 
+const NSEService = require("./backend/nseService").default;
+
 class NSEMarketStream {
+
+    static fastBusy = false;
+    static slowBusy = false;
+    static lastSnapshot = null;
 
     static async initialize() {
 
         console.log(`
         =========================================
-        NSE Market Stream Started
+        NSE LIVE Market Stream Starting
         =========================================
         `);
+
+        try {
+            await NSEService.initialize();
+        } catch (error) {
+            console.error("NSE init error:", error.message);
+        }
 
         this.startStreaming();
     }
 
     /* =========================
-       STREAM LOOP
+       STREAM LOOPS
+       - fast (10s): index quotes for ticker/dashboard
+       - slow (30s): stocks, breadth, PCR, smart money
     ========================= */
 
     static startStreaming() {
 
-        setInterval(async () => {
+        this.fastTick();
+        this.slowTick();
 
-            try {
+        setInterval(() => this.fastTick(), 10000);
+        setInterval(() => this.slowTick(), 30000);
+    }
 
-                const data =
-                    await this.fetchMarket();
+    static async fastTick() {
 
-                this.broadcast(data);
+        if (this.fastBusy) return;
+        this.fastBusy = true;
 
-                await this.cache(data);
+        try {
+            const indices = await NSEService.getIndices();
 
-            } catch (error) {
-
-                console.error(
-                    "NSE Stream Error:",
-                    error
-                );
+            if (indices && indices.length) {
+                const payload = {
+                    type: "indices",
+                    indices,
+                    marketStatus: NSEService.state.marketStatus,
+                    live: NSEService.state.usingLiveData,
+                    timestamp: Date.now()
+                };
+                this.lastSnapshot = payload;
+                io.emit("market-data", payload);
             }
-
-        }, 1000);
+        } catch (error) {
+            console.error("NSE fast stream error:", error.message);
+        } finally {
+            this.fastBusy = false;
+        }
     }
 
-    /* =========================
-       FETCH MARKET
-    ========================= */
+    static async slowTick() {
 
-    static async fetchMarket() {
+        if (this.slowBusy) return;
+        this.slowBusy = true;
 
-        /*
-        NSE / Broker APIs Here
-        */
+        try {
+            const [stocks, breadth, pcr, status] = await Promise.all([
+                NSEService.getStockData("NIFTY 50"),
+                NSEService.getMarketBreadth("NIFTY 50"),
+                NSEService.getPCR("NIFTY"),
+                NSEService.getMarketStatus()
+            ]);
 
-        return {
-
-            symbol: "NIFTY",
-
-            price:
-                24500 +
-
-                Math.random() * 100,
-
-            volume:
-                Math.floor(
-                    Math.random() *
-                    100000
-                ),
-
-            timestamp:
-                Date.now()
-        };
+            io.emit("market-update", {
+                type: "market-update",
+                stocks,
+                breadth,
+                pcr,
+                marketStatus: status?.market,
+                live: NSEService.state.usingLiveData,
+                timestamp: Date.now()
+            });
+        } catch (error) {
+            console.error("NSE slow stream error:", error.message);
+        } finally {
+            this.slowBusy = false;
+        }
     }
-
-    /* =========================
-       BROADCAST
-    ========================= */
-
-    static broadcast(data) {
-
-        io.emit(
-            "market-data",
-            data
-        );
-    }
-
-    /* =========================
-       CACHE
-    ========================= */
-
-static async cache(data) {
-
-    return;
-}
 }
 /* =========================================
    AI SERVER COMMUNICATION

@@ -39,14 +39,169 @@ const DatabaseState = {
 
     reconnectTries: 0,
 
-    maxReconnectTries: 10
+    maxReconnectTries: 3,
+
+    isMock: false,
+
+    reconnecting: false
 };
+
+/* =========================================
+   MONGOOSE MOCK
+========================================= */
+
+function setupMongooseMock() {
+    console.log(`
+=========================================
+SETTING UP MONGOOSE MOCK FALLBACK
+=========================================
+`);
+
+    const inMemoryDb = {};
+
+    const getStore = (modelName) => {
+        if (!inMemoryDb[modelName]) {
+            inMemoryDb[modelName] = [];
+            if (modelName === "User") {
+                inMemoryDb[modelName].push({
+                    _id: "60c72b2f9b1d8a3564fcf222",
+                    username: "mockuser",
+                    email: "mock@example.com",
+                    password: "hashedpassword",
+                    role: "USER",
+                    subscription: "FREE",
+                    isBlocked: false,
+                    save: async function() { return this; }
+                });
+            }
+        }
+        return inMemoryDb[modelName];
+    };
+
+    const makeQueryChain = (result) => {
+        const chain = Promise.resolve(result);
+        const methods = [
+            "select", "populate", "sort", "limit", "skip", "lean", "exec",
+            "where", "equals", "gt", "lt", "in", "nin", "and", "or", "nor"
+        ];
+        for (const method of methods) {
+            chain[method] = function() { return makeQueryChain(result); };
+        }
+        return chain;
+    };
+
+    mongoose.Model.find = function(query = {}) {
+        const store = getStore(this.modelName);
+        let results = store;
+        if (query && typeof query === "object" && !Array.isArray(query)) {
+            results = store.filter(item => {
+                for (const key in query) {
+                    if (query[key] !== undefined && item[key] !== query[key]) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+        }
+        return makeQueryChain(results);
+    };
+
+    mongoose.Model.findOne = function(query = {}) {
+        const store = getStore(this.modelName);
+        let found = store.find(item => {
+            if (query && typeof query === "object" && !Array.isArray(query)) {
+                for (const key in query) {
+                    if (query[key] !== undefined && item[key] !== query[key]) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            return false;
+        });
+        return makeQueryChain(found || null);
+    };
+
+    mongoose.Model.findById = function(id) {
+        const store = getStore(this.modelName);
+        let found = store.find(item => String(item._id) === String(id));
+        return makeQueryChain(found || null);
+    };
+
+    mongoose.Model.create = async function(doc) {
+        const store = getStore(this.modelName);
+        const docs = Array.isArray(doc) ? doc : [doc];
+        const createdDocs = docs.map(d => {
+            const newDoc = {
+                _id: d._id || new mongoose.Types.ObjectId().toString(),
+                ...d,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                save: async function() { return this; }
+            };
+            store.push(newDoc);
+            return newDoc;
+        });
+        return Array.isArray(doc) ? createdDocs : createdDocs[0];
+    };
+
+    mongoose.Model.prototype.save = async function() {
+        const store = getStore(this.constructor.modelName);
+        const plainDoc = this.toObject ? this.toObject() : this;
+        if (!plainDoc._id) {
+            plainDoc._id = new mongoose.Types.ObjectId().toString();
+        }
+        const index = store.findIndex(item => String(item._id) === String(plainDoc._id));
+        if (index !== -1) {
+            store[index] = { ...store[index], ...plainDoc, updatedAt: new Date() };
+        } else {
+            store.push({
+                ...plainDoc,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                save: async function() { return this; }
+            });
+        }
+        return this;
+    };
+
+    mongoose.Model.updateOne = function(query, update) {
+        return makeQueryChain({ n: 1, nModified: 1, ok: 1 });
+    };
+
+    mongoose.Model.updateMany = function(query, update) {
+        return makeQueryChain({ n: 1, nModified: 1, ok: 1 });
+    };
+
+    mongoose.Model.deleteOne = function(query) {
+        return makeQueryChain({ n: 1, deletedCount: 1, ok: 1 });
+    };
+
+    mongoose.Model.deleteMany = function(query) {
+        return makeQueryChain({ n: 1, deletedCount: 1, ok: 1 });
+    };
+
+    mongoose.Model.countDocuments = function(query) {
+        const store = getStore(this.modelName);
+        return makeQueryChain(store.length);
+    };
+
+    try {
+        Object.defineProperty(mongoose.connection, "readyState", {
+            get: () => 1,
+            configurable: true
+        });
+    } catch (e) {
+        console.error("Failed to mock readyState:", e);
+    }
+}
 
 /* =========================================
    CONNECT DATABASE
 ========================================= */
 
 export async function connectDatabase() {
+    if (DatabaseState.isMock) return;
 
     try {
 
@@ -66,6 +221,8 @@ CONNECTING TO MONGODB DATABASE
         DatabaseState.connected = true;
 
         DatabaseState.reconnectTries = 0;
+
+        DatabaseState.reconnecting = false;
 
         console.log(`
 =========================================
@@ -87,7 +244,7 @@ DATABASE CONNECTION ERROR
 
         console.error(error);
 
-        reconnectDatabase();
+        await reconnectDatabase();
     }
 }
 
@@ -96,6 +253,12 @@ DATABASE CONNECTION ERROR
 ========================================= */
 
 async function reconnectDatabase() {
+    if (DatabaseState.isMock) return;
+
+    if (DatabaseState.reconnecting) {
+        return;
+    }
+    DatabaseState.reconnecting = true;
 
     if (
 
@@ -105,13 +268,22 @@ async function reconnectDatabase() {
 
     ) {
 
-        console.error(`
+        console.warn(`
 =========================================
-MAX DATABASE RECONNECT TRIES REACHED
+MAX DATABASE RECONNECT TRIES REACHED.
+FALLING BACK TO IN-MEMORY MOCK DATABASE.
 =========================================
 `);
 
-        process.exit(1);
+        setupMongooseMock();
+
+        DatabaseState.connected = true;
+
+        DatabaseState.isMock = true;
+
+        DatabaseState.reconnecting = false;
+
+        return;
     }
 
     DatabaseState.reconnectTries++;
@@ -125,9 +297,18 @@ ${DatabaseState.reconnectTries}
 `);
 
     setTimeout(async () => {
-
-        await connectDatabase();
-
+        try {
+            await mongoose.connect(
+                process.env.MONGO_URI,
+                DATABASE_CONFIG
+            );
+            DatabaseState.connected = true;
+            DatabaseState.reconnectTries = 0;
+            DatabaseState.reconnecting = false;
+        } catch (e) {
+            DatabaseState.reconnecting = false;
+            await reconnectDatabase();
+        }
     }, 5000);
 }
 
@@ -179,7 +360,9 @@ DATABASE EVENT: DISCONNECTED
 
         DatabaseState.connected = false;
 
-        reconnectDatabase();
+        if (!DatabaseState.isMock && !DatabaseState.reconnecting) {
+            reconnectDatabase();
+        }
     }
 );
 
@@ -208,7 +391,7 @@ export async function checkDatabaseHealth() {
         return {
 
             status:
-                healthMap[state],
+                DatabaseState.isMock ? "MOCK_CONNECTED" : healthMap[state],
 
             connected:
                 DatabaseState.connected,

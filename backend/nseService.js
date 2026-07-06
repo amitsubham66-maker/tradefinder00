@@ -1,20 +1,11 @@
 /* =========================================
    TRADEFINDER AI - NSE MARKET SERVICE
+   Live data from nseindia.com (new API structure, 2026)
 ========================================= */
 
 import axios from "axios";
-
 import dotenv from "dotenv";
-
-import {
-
-    cacheMarketData,
-
-    cacheOptionsData,
-
-    getCache
-
-} from "./redis.js";
+import { cacheMarketData, cacheOptionsData, getCache, setCache } from "./redis.js";
 
 dotenv.config();
 
@@ -22,56 +13,69 @@ dotenv.config();
    NSE CONFIG
 ========================================= */
 
+const BASE = "https://www.nseindia.com";
+
 const NSE_CONFIG = {
+    BASE_URL: BASE,
 
-    BASE_URL:
-        "https://www.nseindia.com",
+    // Page used only to obtain session cookies (homepage returns 403 to non-browsers)
+    COOKIE_PAGE: `${BASE}/option-chain`,
 
-    OPTION_CHAIN:
-        "https://www.nseindia.com/api/option-chain-indices",
+    MARKET_STATUS: `${BASE}/api/marketStatus`,
+    ALL_INDICES: `${BASE}/api/allIndices`,
+    INDEX_DATA: `${BASE}/api/NextApi/apiClient?functionName=getIndexData&&type=All`,
+    VARIATIONS: `${BASE}/api/live-analysis-variations?index=`,
+    OC_CONTRACT_INFO: `${BASE}/api/option-chain-contract-info?symbol=`,
+    OC_V3: `${BASE}/api/option-chain-v3`,
 
-    EQUITY_STOCKS:
-        "https://www.nseindia.com/api/equity-stockIndices",
+    TIMEOUT: 15000,
 
-    MARKET_STATUS:
-        "https://www.nseindia.com/api/marketStatus",
-
-    ALL_INDICES:
-        "https://www.nseindia.com/api/allIndices",
+    // Session cookies expire quickly on NSE; refresh proactively
+    COOKIE_TTL_MS: 20 * 60 * 1000,
 
     HEADERS: {
-
         "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-
-        "Accept":
-            "application/json",
-
-        "Accept-Language":
-            "en-US,en;q=0.9",
-
-        "Referer":
-            "https://www.nseindia.com/",
-
-        "Connection":
-            "keep-alive"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": `${BASE}/option-chain`,
+        "Connection": "keep-alive"
     }
 };
+
+// live-analysis-variations groups stocks under these category keys
+const INDEX_CATEGORY_MAP = {
+    "NIFTY": "NIFTY",
+    "NIFTY 50": "NIFTY",
+    "BANKNIFTY": "BANKNIFTY",
+    "NIFTY BANK": "BANKNIFTY",
+    "NIFTYNEXT50": "NIFTYNEXT50",
+    "NIFTY NEXT 50": "NIFTYNEXT50",
+    "FO": "FOSec",
+    "FOSEC": "FOSec",
+    "ALL": "allSec",
+    "ALLSEC": "allSec"
+};
+
+const OPTION_INDEX_SYMBOLS = new Set([
+    "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"
+]);
 
 /* =========================================
    NSE STATE
 ========================================= */
 
 const NSEState = {
-
     cookies: "",
-
-    marketStatus: "CLOSED",
-
+    cookiesFetchedAt: 0,
+    marketStatus: "UNKNOWN",
     lastUpdated: null,
-
-    requestCount: 0
+    requestCount: 0,
+    usingLiveData: false
 };
+
+// Dedupe concurrent requests to the same URL
+const inflight = new Map();
 
 /* =========================================
    NSE SERVICE CLASS
@@ -79,121 +83,236 @@ const NSEState = {
 
 class NSEService {
 
-
     /* =========================
        INITIALIZE
     ========================= */
 
     static async initialize() {
-
-        console.log(`
-=========================================
-INITIALIZING NSE SERVICE
-=========================================
-`);
-
+        console.log("[NSE] Initializing NSE service...");
         await this.initializeSession();
-
         await this.getMarketStatus();
+        console.log(`[NSE] Ready. Market status: ${NSEState.marketStatus}`);
+    }
+
+    static get state() {
+        return {
+            marketStatus: NSEState.marketStatus,
+            lastUpdated: NSEState.lastUpdated,
+            requestCount: NSEState.requestCount,
+            usingLiveData: NSEState.usingLiveData
+        };
     }
 
     /* =========================
-       NSE SESSION INIT
+       NSE SESSION (COOKIES)
     ========================= */
 
     static async initializeSession() {
-
         try {
+            const response = await axios.get(NSE_CONFIG.COOKIE_PAGE, {
+                headers: {
+                    ...NSE_CONFIG.HEADERS,
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                },
+                timeout: NSE_CONFIG.TIMEOUT
+            });
 
-            const response =
-                await axios.get(
-
-                    NSE_CONFIG.BASE_URL,
-
-                    {
-
-                        headers:
-                            NSE_CONFIG.HEADERS
-                    }
-                );
-
-            const cookies =
-                response.headers[
-                    "set-cookie"
-                ];
-
-            if (cookies) {
-
-                NSEState.cookies =
-                    cookies.join("; ");
+            const cookies = response.headers["set-cookie"];
+            if (cookies && cookies.length) {
+                NSEState.cookies = cookies.map(c => c.split(";")[0]).join("; ");
+                NSEState.cookiesFetchedAt = Date.now();
+                console.log("[NSE] Session cookies acquired");
             }
+        } catch (error) {
+            // Some cookie pages still send cookies on error responses
+            const cookies = error.response?.headers?.["set-cookie"];
+            if (cookies && cookies.length) {
+                NSEState.cookies = cookies.map(c => c.split(";")[0]).join("; ");
+                NSEState.cookiesFetchedAt = Date.now();
+                console.log("[NSE] Session cookies acquired (from error response)");
+            } else {
+                console.error(`[NSE] Session init failed: ${error.message}`);
+            }
+        }
+    }
 
-            console.log(`
-=========================================
-NSE SESSION INITIALIZED
-=========================================
-`);
+    /* =========================================
+       NSE HTTP CLIENT WITH COOKIE AUTO-REFRESH
+    ========================================= */
 
+    static async requestNSE(url) {
+        if (inflight.has(url)) {
+            return inflight.get(url);
         }
 
-        catch (error) {
+        const promise = this._requestNSE(url).finally(() => inflight.delete(url));
+        inflight.set(url, promise);
+        return promise;
+    }
 
-            console.error(`
-=========================================
-NSE SESSION ERROR
-=========================================
-`);
+    static async _requestNSE(url) {
+        const cookiesStale =
+            !NSEState.cookies ||
+            Date.now() - NSEState.cookiesFetchedAt > NSE_CONFIG.COOKIE_TTL_MS;
 
-            console.error(error.message);
+        if (cookiesStale) {
+            await this.initializeSession();
+        }
+
+        try {
+            return await this._doGet(url);
+        } catch (error) {
+            console.warn(`[NSE] Request failed (${error.response?.status || error.message}), refreshing session and retrying: ${url}`);
+            await this.initializeSession();
+            const data = await this._doGet(url);
+            return data;
+        }
+    }
+
+    static async _doGet(url) {
+        const response = await axios.get(url, {
+            headers: {
+                ...NSE_CONFIG.HEADERS,
+                Cookie: NSEState.cookies
+            },
+            timeout: NSE_CONFIG.TIMEOUT
+        });
+        NSEState.requestCount++;
+        NSEState.lastUpdated = new Date();
+        NSEState.usingLiveData = true;
+        return response.data;
+    }
+
+    /* =========================
+       MARKET STATUS (LIVE)
+    ========================= */
+
+    static async getMarketStatus() {
+        try {
+            const data = await this.requestNSE(NSE_CONFIG.MARKET_STATUS);
+            const capitalMarket = data?.marketState?.find(
+                m => m.market === "Capital Market"
+            ) || data?.marketState?.[0];
+
+            NSEState.marketStatus = capitalMarket?.marketStatus || "UNKNOWN";
+
+            return {
+                market: NSEState.marketStatus,
+                marketStates: data?.marketState || [],
+                exchange: "NSE",
+                live: true,
+                timestamp: new Date()
+            };
+        } catch (error) {
+            console.error(`[NSE] Market status error: ${error.message}`);
+            return {
+                market: NSEState.marketStatus,
+                exchange: "NSE",
+                live: false,
+                timestamp: new Date()
+            };
         }
     }
 
     /* =========================
-       GET MARKET STATUS
+       ALL INDICES (LIVE)
     ========================= */
 
-    static async getMarketStatus() {
+    static async getIndices() {
+        const cacheKey = "nse:indices";
+        const cached = await getCache(cacheKey);
+        if (cached) return cached;
 
         try {
+            const data = await this.requestNSE(NSE_CONFIG.INDEX_DATA);
+            const indices = (data?.data || []).map(ix => ({
+                index: ix.indexName,
+                last: ix.last,
+                open: ix.open,
+                high: ix.high,
+                low: ix.low,
+                previousClose: ix.previousClose,
+                change: Number((ix.last - ix.previousClose).toFixed(2)),
+                percentChange: ix.percChange,
+                yearHigh: ix.yearHigh,
+                yearLow: ix.yearLow,
+                timeVal: ix.timeVal
+            }));
 
-            const response =
-                await axios.get(
+            if (!indices.length) throw new Error("Empty index data");
 
-                    NSE_CONFIG.MARKET_STATUS,
-
-                    {
-
-                        headers: {
-
-                            ...NSE_CONFIG.HEADERS,
-
-                            Cookie:
-                                NSEState.cookies
-                        }
-                    }
-                );
-
-            NSEState.marketStatus =
-                response.data
-                ?.marketState?.[0]
-                ?.marketStatus || "UNKNOWN";
-
-            return response.data;
-
+            await setCache(cacheKey, indices, 5);
+            return indices;
+        } catch (error) {
+            console.error(`[NSE] Index data error, trying allIndices: ${error.message}`);
+            // Fallback: the broader allIndices API (works even without cookies)
+            try {
+                const data = await this.requestNSE(NSE_CONFIG.ALL_INDICES);
+                const indices = (data?.data || []).map(ix => ({
+                    index: ix.index || ix.indexName,
+                    last: ix.last,
+                    open: ix.open,
+                    high: ix.high,
+                    low: ix.low,
+                    previousClose: ix.previousClose,
+                    change: Number(((ix.last ?? 0) - (ix.previousClose ?? 0)).toFixed(2)),
+                    percentChange: ix.percentChange ?? ix.percChange,
+                    yearHigh: ix.yearHigh,
+                    yearLow: ix.yearLow
+                }));
+                await setCache(cacheKey, indices, 5);
+                return indices;
+            } catch (err2) {
+                console.error(`[NSE] allIndices also failed: ${err2.message}`);
+                NSEState.usingLiveData = false;
+                return [];
+            }
         }
+    }
 
-        catch (error) {
+    /* =========================
+       GAINERS / LOSERS (LIVE)
+       Also the source for per-index stock lists,
+       since NSE retired equity-stockIndices.
+    ========================= */
 
-            console.error(`
-=========================================
-MARKET STATUS ERROR
-=========================================
-`);
+    static normalizeVariationStock(s) {
+        const change = Number(((s.ltp ?? 0) - (s.prev_price ?? 0)).toFixed(2));
+        return {
+            symbol: s.symbol,
+            lastPrice: s.ltp,
+            change,
+            pChange: s.perChange ?? s.net_price ?? 0,
+            open: s.open_price,
+            dayHigh: s.high_price,
+            dayLow: s.low_price,
+            previousClose: s.prev_price,
+            totalTradedVolume: s.trade_quantity ?? 0,
+            turnover: s.turnover ?? 0
+        };
+    }
 
-            console.error(error.message);
+    static async getVariations(kind) {
+        // kind: "gainers" | "loosers"
+        const cacheKey = `nse:variations:${kind}`;
+        const cached = await getCache(cacheKey);
+        if (cached) return cached;
 
-            return null;
-        }
+        const data = await this.requestNSE(`${NSE_CONFIG.VARIATIONS}${kind}`);
+        await setCache(cacheKey, data, 10);
+        return data;
+    }
+
+    static async getGainers(index = "NIFTY") {
+        const category = INDEX_CATEGORY_MAP[String(index).toUpperCase()] || "NIFTY";
+        const data = await this.getVariations("gainers");
+        return (data?.[category]?.data || []).map(s => this.normalizeVariationStock(s));
+    }
+
+    static async getLosers(index = "NIFTY") {
+        const category = INDEX_CATEGORY_MAP[String(index).toUpperCase()] || "NIFTY";
+        const data = await this.getVariations("loosers");
+        return (data?.[category]?.data || []).map(s => this.normalizeVariationStock(s));
     }
 
     /* =========================
@@ -201,135 +320,134 @@ MARKET STATUS ERROR
     ========================= */
 
     static async getStockData(index = "NIFTY 50") {
-
+        const cacheKey = `stocks:${index}`;
         try {
+            const cached = await getCache(cacheKey);
+            if (cached && cached.length) return cached;
 
-            const cacheKey =
-                `stocks:${index}`;
+            const [gainers, losers] = await Promise.all([
+                this.getGainers(index),
+                this.getLosers(index)
+            ]);
 
-            const cached =
-                await getCache(cacheKey);
+            const seen = new Set();
+            const stocks = [...gainers, ...losers]
+                .filter(s => {
+                    if (!s.symbol || seen.has(s.symbol)) return false;
+                    seen.add(s.symbol);
+                    return true;
+                })
+                .sort((a, b) => b.pChange - a.pChange);
 
-            if (cached) {
-
-                return cached;
+            if (!stocks.length) {
+                throw new Error(`No live stocks for index ${index}`);
             }
 
-            const response =
-                await axios.get(
-
-                    `${NSE_CONFIG.EQUITY_STOCKS}?index=${encodeURIComponent(index)}`,
-
-                    {
-
-                        headers: {
-
-                            ...NSE_CONFIG.HEADERS,
-
-                            Cookie:
-                                NSEState.cookies
-                        }
-                    }
-                );
-
-            const stocks =
-                response.data?.data || [];
-
-            await cacheMarketData(
-
-                index,
-
-                stocks
-            );
-
-            NSEState.requestCount++;
-
+            await cacheMarketData(index, stocks);
+            await setCache(cacheKey, stocks, 10);
             return stocks;
-
-        }
-
-        catch (error) {
-
-            console.error(`
-=========================================
-STOCK DATA ERROR
-=========================================
-`);
-
-            console.error(error.message);
-
-            return [];
+        } catch (error) {
+            console.error(`[NSE] Stock data error for ${index}, serving mock fallback: ${error.message}`);
+            NSEState.usingLiveData = false;
+            return this.getMockStocks();
         }
     }
 
+    static getMockStocks() {
+        return [
+            { symbol: "RELIANCE", lastPrice: 2984.50, change: 61.50, pChange: 2.11, totalTradedVolume: 1500000, isMock: true },
+            { symbol: "HDFCBANK", lastPrice: 1688.20, change: -12.80, pChange: -0.75, totalTradedVolume: 2100000, isMock: true },
+            { symbol: "TCS", lastPrice: 3820.00, change: -17.00, pChange: -0.44, totalTradedVolume: 800000, isMock: true },
+            { symbol: "INFY", lastPrice: 1545.00, change: 18.90, pChange: 1.24, totalTradedVolume: 1200000, isMock: true },
+            { symbol: "TATASTEEL", lastPrice: 172.10, change: 3.50, pChange: 2.08, totalTradedVolume: 3500000, isMock: true }
+        ];
+    }
+
     /* =========================
-       OPTION CHAIN
+       OPTION CHAIN (LIVE, v3 API)
     ========================= */
 
-    static async getOptionChain(
+    static async getExpiryDates(symbol = "NIFTY") {
+        const cacheKey = `oc-expiry:${symbol}`;
+        const cached = await getCache(cacheKey);
+        if (cached) return cached;
 
-        symbol = "NIFTY"
+        const data = await this.requestNSE(`${NSE_CONFIG.OC_CONTRACT_INFO}${encodeURIComponent(symbol)}`);
+        const expiries = data?.expiryDates || [];
+        if (expiries.length) {
+            await setCache(cacheKey, expiries, 3600);
+        }
+        return expiries;
+    }
 
-    ) {
-
+    static async getOptionChain(symbol = "NIFTY") {
+        const sym = String(symbol).toUpperCase();
+        const cacheKey = `option-chain:${sym}`;
         try {
+            const cached = await getCache(cacheKey);
+            if (cached) return cached;
 
-            const cacheKey =
-                `option-chain:${symbol}`;
+            const expiries = await this.getExpiryDates(sym);
+            if (!expiries.length) throw new Error(`No expiries for ${sym}`);
 
-            const cached =
-                await getCache(cacheKey);
+            const type = OPTION_INDEX_SYMBOLS.has(sym) ? "Indices" : "Equities";
+            const url = `${NSE_CONFIG.OC_V3}?type=${type}&symbol=${encodeURIComponent(sym)}&expiry=${encodeURIComponent(expiries[0])}`;
+            const data = await this.requestNSE(url);
 
-            if (cached) {
-
-                return cached;
+            if (!data?.records?.data?.length) {
+                throw new Error(`Empty option chain for ${sym}`);
             }
 
-            const response =
-                await axios.get(
+            data.records.expiryDates = expiries;
+            data.isLive = true;
 
-                    `${NSE_CONFIG.OPTION_CHAIN}?symbol=${symbol}`,
-
-                    {
-
-                        headers: {
-
-                            ...NSE_CONFIG.HEADERS,
-
-                            Cookie:
-                                NSEState.cookies
-                        }
-                    }
-                );
-
-            const options =
-                response.data;
-
-            await cacheOptionsData(
-
-                symbol,
-
-                options
-            );
-
-            NSEState.requestCount++;
-
-            return options;
-
+            await cacheOptionsData(sym, data);
+            await setCache(cacheKey, data, 30);
+            return data;
+        } catch (error) {
+            console.error(`[NSE] Option chain error for ${sym}, serving mock fallback: ${error.message}`);
+            NSEState.usingLiveData = false;
+            return this.getMockOptionChain();
         }
+    }
 
-        catch (error) {
-
-            console.error(`
-=========================================
-OPTION CHAIN ERROR
-=========================================
-`);
-
-            console.error(error.message);
-
-            return null;
+    static getMockOptionChain() {
+        const mockData = [];
+        const spotPrice = 24430;
+        for (let i = -10; i <= 10; i++) {
+            const strike = spotPrice - (spotPrice % 50) + (i * 50);
+            const isITM_CE = strike < spotPrice;
+            const isITM_PE = strike > spotPrice;
+            mockData.push({
+                strikePrice: strike,
+                CE: {
+                    openInterest: Math.floor(Math.random() * 50000) + 10000,
+                    changeinOpenInterest: Math.floor(Math.random() * 10000) - 5000,
+                    impliedVolatility: Number((Math.random() * 5 + 10).toFixed(2)),
+                    lastPrice: Number((isITM_CE ? (spotPrice - strike) + Math.random() * 20 : Math.random() * 50).toFixed(2)),
+                    change: Number((Math.random() * 20 - 10).toFixed(2)),
+                    pChange: Number((Math.random() * 10 - 5).toFixed(2)),
+                    totalTradedVolume: Math.floor(Math.random() * 100000)
+                },
+                PE: {
+                    openInterest: Math.floor(Math.random() * 50000) + 10000,
+                    changeinOpenInterest: Math.floor(Math.random() * 10000) - 5000,
+                    impliedVolatility: Number((Math.random() * 5 + 10).toFixed(2)),
+                    lastPrice: Number((isITM_PE ? (strike - spotPrice) + Math.random() * 20 : Math.random() * 50).toFixed(2)),
+                    change: Number((Math.random() * 20 - 10).toFixed(2)),
+                    pChange: Number((Math.random() * 10 - 5).toFixed(2)),
+                    totalTradedVolume: Math.floor(Math.random() * 100000)
+                }
+            });
         }
+        return {
+            records: {
+                data: mockData,
+                underlyingValue: spotPrice,
+                timestamp: new Date().toLocaleString()
+            },
+            isLive: false
+        };
     }
 
     /* =========================
@@ -337,72 +455,72 @@ OPTION CHAIN ERROR
     ========================= */
 
     static async getPCR(symbol = "NIFTY") {
-
         try {
-
-            const optionData =
-                await this.getOptionChain(symbol);
-
-            if (!optionData) {
-
-                return null;
-            }
+            const optionData = await this.getOptionChain(symbol);
+            if (!optionData?.records?.data) return null;
 
             let totalCE = 0;
-
             let totalPE = 0;
 
-            optionData.records.data.forEach(
+            optionData.records.data.forEach(strike => {
+                totalCE += strike.CE?.openInterest || 0;
+                totalPE += strike.PE?.openInterest || 0;
+            });
 
-                strike => {
-
-                    totalCE +=
-                        strike.CE?.openInterest || 0;
-
-                    totalPE +=
-                        strike.PE?.openInterest || 0;
-                }
-            );
-
-            const pcr =
-                totalPE / totalCE;
+            const pcr = totalCE > 0 ? totalPE / totalCE : 0;
 
             return {
-
                 symbol,
-
                 totalCE,
-
                 totalPE,
-
-                pcr:
-                    Number(
-                        pcr.toFixed(2)
-                    ),
-
+                pcr: Number(pcr.toFixed(2)),
+                underlyingValue: optionData.records.underlyingValue,
+                isLive: optionData.isLive !== false,
                 interpretation:
-
-                    pcr > 1
-                    ? "BULLISH"
-
-                    : pcr < 0.7
-                    ? "BEARISH"
-
+                    pcr > 1 ? "BULLISH"
+                    : pcr < 0.7 ? "BEARISH"
                     : "NEUTRAL"
             };
-
+        } catch (error) {
+            console.error(`[NSE] PCR error: ${error.message}`);
+            return null;
         }
+    }
 
-        catch (error) {
+    /* =========================
+       MAX PAIN
+    ========================= */
 
-            console.error(`
-=========================================
-PCR ERROR
-=========================================
-`);
+    static async getMaxPain(symbol = "NIFTY") {
+        try {
+            const optionData = await this.getOptionChain(symbol);
+            const rows = optionData?.records?.data || [];
+            if (!rows.length) return null;
 
-            console.error(error.message);
+            // Total option writers' loss at each strike; minimum = max pain
+            let best = null;
+            for (const candidate of rows) {
+                const expiryPrice = candidate.strikePrice;
+                let loss = 0;
+                for (const row of rows) {
+                    const ceOI = row.CE?.openInterest || 0;
+                    const peOI = row.PE?.openInterest || 0;
+                    loss += Math.max(expiryPrice - row.strikePrice, 0) * ceOI;
+                    loss += Math.max(row.strikePrice - expiryPrice, 0) * peOI;
+                }
+                if (!best || loss < best.loss) {
+                    best = { strike: expiryPrice, loss };
+                }
+            }
 
+            return {
+                symbol,
+                maxPain: best.strike,
+                underlyingValue: optionData.records.underlyingValue,
+                isLive: optionData.isLive !== false
+            };
+        } catch (error) {
+            console.error(`[NSE] Max pain error: ${error.message}`);
             return null;
         }
     }
@@ -411,66 +529,28 @@ PCR ERROR
        MARKET BREADTH
     ========================= */
 
-    static async getMarketBreadth() {
-
+    static async getMarketBreadth(index = "NIFTY 50") {
         try {
-
-            const stocks =
-                await this.getStockData();
+            const stocks = await this.getStockData(index);
 
             let advances = 0;
-
             let declines = 0;
-
             let unchanged = 0;
 
             stocks.forEach(stock => {
-
-                if (
-                    stock.pChange > 0
-                ) {
-
-                    advances++;
-
-                } else if (
-                    stock.pChange < 0
-                ) {
-
-                    declines++;
-
-                } else {
-
-                    unchanged++;
-                }
+                if (stock.pChange > 0) advances++;
+                else if (stock.pChange < 0) declines++;
+                else unchanged++;
             });
 
             return {
-
                 advances,
-
                 declines,
-
                 unchanged,
-
-                breadthRatio:
-                    (
-                        advances /
-                        (declines || 1)
-                    ).toFixed(2)
+                breadthRatio: (advances / (declines || 1)).toFixed(2)
             };
-
-        }
-
-        catch (error) {
-
-            console.error(`
-=========================================
-MARKET BREADTH ERROR
-=========================================
-`);
-
-            console.error(error.message);
-
+        } catch (error) {
+            console.error(`[NSE] Market breadth error: ${error.message}`);
             return null;
         }
     }
@@ -480,46 +560,23 @@ MARKET BREADTH ERROR
     ========================= */
 
     static async getSmartMoneyFlow() {
-
         try {
-
-            const pcr =
-                await this.getPCR();
-
-            const breadth =
-                await this.getMarketBreadth();
+            const [pcr, breadth] = await Promise.all([
+                this.getPCR(),
+                this.getMarketBreadth()
+            ]);
 
             return {
-
                 institutionalBias:
-
-                    pcr?.pcr > 1 &&
-                    breadth?.breadthRatio > 1
-
-                    ? "BULLISH"
-
-                    : "BEARISH",
-
+                    pcr?.pcr > 1 && Number(breadth?.breadthRatio) > 1
+                        ? "BULLISH"
+                        : "BEARISH",
                 pcr,
-
                 breadth,
-
-                timestamp:
-                    Date.now()
+                timestamp: Date.now()
             };
-
-        }
-
-        catch (error) {
-
-            console.error(`
-=========================================
-SMART MONEY FLOW ERROR
-=========================================
-`);
-
-            console.error(error.message);
-
+        } catch (error) {
+            console.error(`[NSE] Smart money flow error: ${error.message}`);
             return null;
         }
     }
@@ -528,140 +585,32 @@ SMART MONEY FLOW ERROR
        LIVE INTRADAY ANALYSIS
     ========================= */
 
-    static async getIntradayAnalysis(
-
-        symbol = "NIFTY"
-
-    ) {
-
+    static async getIntradayAnalysis(symbol = "NIFTY") {
         try {
-
-            const optionChain =
-                await this.getOptionChain(symbol);
-
-            const pcr =
-                await this.getPCR(symbol);
-
-            const smartMoney =
-                await this.getSmartMoneyFlow();
+            const [optionChain, pcr, smartMoney] = await Promise.all([
+                this.getOptionChain(symbol),
+                this.getPCR(symbol),
+                this.getSmartMoneyFlow()
+            ]);
 
             return {
-
                 symbol,
-
-                trend:
-                    pcr?.interpretation,
-
-                smartMoney:
-                    smartMoney
-                    ?.institutionalBias,
-
+                trend: pcr?.interpretation,
+                smartMoney: smartMoney?.institutionalBias,
                 optionChain,
-
                 pcr,
-
-                confidence:
-
-                    pcr?.pcr > 1
-                    ? 82
-                    : 61,
-
-                timestamp:
-                    Date.now()
+                confidence: pcr?.pcr > 1 ? 82 : 61,
+                timestamp: Date.now()
             };
-
-        }
-
-        catch (error) {
-
-            console.error(`
-=========================================
-INTRADAY ANALYSIS ERROR
-=========================================
-`);
-
-            console.error(error.message);
-
+        } catch (error) {
+            console.error(`[NSE] Intraday analysis error: ${error.message}`);
             return null;
         }
     }
-
-    /* =========================
-       LIVE MARKET STREAM
-    ========================= */
-
-    static async streamMarketData() {
-
-        setInterval(async () => {
-
-            try {
-
-                const nifty =
-                    await this.getIntradayAnalysis(
-                        "NIFTY"
-                    );
-
-                const banknifty =
-                    await this.getIntradayAnalysis(
-                        "BANKNIFTY"
-                    );
-
-                console.log(`
-=========================================
-LIVE MARKET STREAM ACTIVE
-=========================================
-`);
-
-                console.log({
-
-                    niftyTrend:
-                        nifty?.trend,
-
-                    bankniftyTrend:
-                        banknifty?.trend
-                });
-
-            }
-
-            catch (error) {
-
-                console.error(`
-=========================================
-MARKET STREAM ERROR
-=========================================
-`);
-
-                console.error(error.message);
-            }
-
-        }, 5000);
-    }
-    static async getMarketStatus() {
-
-    return {
-        market: "OPEN",
-        timestamp: new Date(),
-        exchange: "NSE"
-    };
-
 }
-}
-
-/* =========================================
-   AUTO INITIALIZE
-========================================= */
-
-(async () => {
-
-    await NSEService.initialize();
-
-})();
 
 /* =========================================
    EXPORTS
 ========================================= */
 
 export default NSEService;
-console.log("NSEService loaded");
-console.log(typeof NSEService);
-console.log(Object.getOwnPropertyNames(NSEService));

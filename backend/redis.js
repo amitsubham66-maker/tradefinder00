@@ -1,59 +1,57 @@
 /* =========================================
-   TRADEFINDER AI - REDIS DISABLED
+   TRADEFINDER AI - REDIS WRAPPER
 ========================================= */
 
-/* =========================================
-   DUMMY REDIS OBJECT
-========================================= */
+import RedisService, { redisPublisher, redisSubscriber, redisClient } from "./redisService.js";
 
-const redis = null;
+const redis = redisClient;
 
 /* =========================================
    CACHE FUNCTIONS
 ========================================= */
 
-export async function setCache() {
-    return true;
+export async function setCache(key, value, expiry = 60) {
+    return await RedisService.set(key, value, expiry);
 }
 
-export async function getCache() {
-    return null;
+export async function getCache(key) {
+    return await RedisService.get(key);
 }
 
-export async function deleteCache() {
-    return true;
+export async function deleteCache(key) {
+    return await RedisService.delete(key);
 }
 
-export async function cacheMarketData() {
-    return true;
+export async function cacheMarketData(symbol, data) {
+    return await RedisService.cacheMarketData(symbol, data);
 }
 
-export async function cacheOptionsData() {
-    return true;
+export async function cacheOptionsData(symbol, data) {
+    return await RedisService.set(`options:${symbol}`, data, 60);
 }
 
-export async function cacheAISignal() {
-    return true;
+export async function cacheAISignal(symbol, signal) {
+    return await RedisService.cacheAISignal(symbol, signal);
 }
 
-export async function cacheUserSession() {
-    return true;
+export async function cacheUserSession(sessionId, data) {
+    return await RedisService.storeSession(sessionId, data);
 }
 
 /* =========================================
-   PUB / SUB DISABLED
+   PUB / SUB
 ========================================= */
 
-export const publisher = null;
+export const publisher = redisPublisher;
 
-export const subscriber = null;
+export const subscriber = redisSubscriber;
 
-export async function publishMessage() {
-    return true;
+export async function publishMessage(channel, message) {
+    return await RedisService.publish(channel, message);
 }
 
-export function subscribeChannel() {
-    return true;
+export function subscribeChannel(channel, callback) {
+    return RedisService.subscribe(channel, callback);
 }
 
 /* =========================================
@@ -61,13 +59,10 @@ export function subscribeChannel() {
 ========================================= */
 
 export async function checkRedisHealth() {
-
+    const isHealthy = await RedisService.healthCheck();
     return {
-
-        status: "DISABLED",
-
-        connected: false,
-
+        status: isHealthy ? "CONNECTED" : "FALLBACK",
+        connected: isHealthy,
         timestamp: new Date()
     };
 }
@@ -77,10 +72,15 @@ export async function checkRedisHealth() {
 ========================================= */
 
 export async function clearAllCache() {
-
-    console.log("Redis Disabled");
-
-    return true;
+    try {
+        if (redisClient && typeof redisClient.flushall === "function") {
+            await redisClient.flushall();
+        }
+        return true;
+    } catch (error) {
+        console.error("Error clearing Redis cache:", error);
+        return false;
+    }
 }
 
 /* =========================================
