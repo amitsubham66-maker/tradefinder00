@@ -1,0 +1,181 @@
+version: "3.9"
+
+services:
+
+  /* =====================================
+     BACKEND SERVICE
+  ===================================== */
+
+  backend:
+
+    container_name: tradefinder_backend
+
+    build:
+
+      context: .
+
+      dockerfile: Dockerfile
+
+    restart: always
+
+    ports:
+
+      - "5000:5000"
+
+    env_file:
+
+      - .env
+
+    depends_on:
+
+      - mongodb
+
+      - redis
+
+    volumes:
+
+      - ./:/app
+
+      - /app/node_modules
+
+      - ./backend/logs:/app/backend/logs
+
+    networks:
+
+      - tradefinder_network
+
+  /* =====================================
+     FRONTEND SERVICE
+  ===================================== */
+
+  frontend:
+
+    container_name: tradefinder_frontend
+
+    image: nginx:latest
+
+    restart: always
+
+    ports:
+
+      - "3000:80"
+
+    volumes:
+
+      - ./frontend:/usr/share/nginx/html
+
+    depends_on:
+
+      - backend
+
+    networks:
+
+      - tradefinder_network
+
+  /* =====================================
+     MONGODB SERVICE
+  ===================================== */
+
+  mongodb:
+
+    container_name: tradefinder_mongodb
+
+    image: mongo:latest
+
+    restart: always
+
+    ports:
+
+      - "27017:27017"
+
+    environment:
+
+      MONGO_INITDB_ROOT_USERNAME: admin
+
+      MONGO_INITDB_ROOT_PASSWORD: password
+
+    volumes:
+
+      - mongodb_data:/data/db
+
+    networks:
+
+      - tradefinder_network
+
+  /* =====================================
+     REDIS SERVICE
+  ===================================== */
+
+  redis:
+
+    container_name: tradefinder_redis
+
+    image: redis:latest
+
+    restart: always
+
+    ports:
+
+      - "6379:6379"
+
+    volumes:
+
+      - redis_data:/data
+
+    networks:
+
+      - tradefinder_network
+
+  /* =====================================
+     NGINX REVERSE PROXY
+  ===================================== */
+
+  nginx:
+
+    container_name: tradefinder_nginx
+
+    image: nginx:latest
+
+    restart: always
+
+    ports:
+
+      - "80:80"
+
+      - "443:443"
+
+    volumes:
+
+      - ./nginx.conf:/etc/nginx/nginx.conf
+
+      - ./ssl:/etc/nginx/ssl
+
+    depends_on:
+
+      - frontend
+
+      - backend
+
+    networks:
+
+      - tradefinder_network
+
+/* =====================================
+   NETWORKS
+===================================== */
+
+networks:
+
+  tradefinder_network:
+
+    driver: bridge
+
+/* =====================================
+   VOLUMES
+===================================== */
+
+volumes:
+
+  mongodb_data:
+
+  redis_data:
